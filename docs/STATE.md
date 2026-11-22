@@ -22,9 +22,8 @@ None open. Everything is committed (HEAD: `git log -1`). Goal 5 documentation au
 
 ## Needs you
 - Delete /tmp/durable-web-orig-git-backup (old unscrubbed history) when satisfied with the new history.
-- Provide a GitHub remote; nothing has been pushed.
 - Second host user check not possible here (PLAN 5.2).
 
 ## Next steps
-1. Push to the public GitHub repo once a remote is given.
+1. Done: pushed to https://github.com/AngelGarzaDev/Pi-Durable-Harness.git (main). Future pushes: see AGENTS.md "Pushing".
 2. Optional: work through docs/REVIEW-2026-11-22.md items not yet fixed (F5, F6 Secure flag, F23).
