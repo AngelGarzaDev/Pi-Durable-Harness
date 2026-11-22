@@ -191,3 +191,6 @@
 - Checked in a static harness (copy of the page styles with sample transcript, python http.server on 127.0.0.1:8999, not the live app: the live page needs the token, which is not put in tool calls). Live browser check still to do.
 - 2026-11-22 chat bubbles (user m01081): your messages are right-aligned bubbles, Claude's are left-aligned bubbles (same width rules, role label hidden). Tool lines and reviews stay full width. CSS only. Checked in the static harness.
 - 2026-11-22 chat list order (user m01101): oldest first. Chat ids are assigned in creation order, so sorting by id is chronological. Forks are listed directly under their parent, oldest first. Logic in public/chat-order.js (pure function), tests/chat-order.test.ts (3 tests). Assumes ids are monotonic in storage; if not, the list would need a created-at field.
+
+## 2026-11-22 production deploy 2a08cad (user m01101)
+- Backup by streaming tar (bind mount not used). deploy.sh → healthy at 8790, .deployed-commit 2a08cad. Read-only WS checks only.
