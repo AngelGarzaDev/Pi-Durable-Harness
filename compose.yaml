@@ -1,0 +1,66 @@
+# Default: the runner has NO internet access (its network is internal). See compose.internet.yaml to allow it.
+name: pi-durable-web
+
+services:
+  app:
+    build: { context: ., target: app }
+    image: pi-durable-web-app:local
+    user: "1000:1000"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATA_DIR: /data
+      RUNNER_URL: http://runner:7000
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      APP_TOKEN_FILE: /run/secrets/app_token
+    secrets: [anthropic_api_key, app_token]
+    volumes: ["app-data:/data"]
+    ports: ["127.0.0.1:8787:8787"]
+    networks: [edge, tools]
+    depends_on:
+      runner: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  runner:
+    build: { context: ., target: runner }
+    image: pi-durable-web-runner:local
+    user: "10001:10001"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      RUNNER_HOST: 0.0.0.0
+      RUNNER_PORT: "7000"
+      WORKSPACE_DIR: /workspace
+    volumes: ["workspace:/workspace"]
+    networks: [tools]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  edge: {}                 # normal bridge: app reaches api.anthropic.com
+  tools: { internal: true } # no route to the outside world: app <-> runner only
+
+secrets:
+  anthropic_api_key:
+    file: ./secrets/anthropic_api_key
+  app_token:
+    file: ./secrets/app_token
+
+volumes:
+  app-data: {}
+  workspace: {}

@@ -1,0 +1,8 @@
+# Override: lets the RUNNER (shell and file tools) reach the internet.
+# Use: docker compose -f compose.yaml -f compose.internet.yaml up -d --build
+services:
+  runner:
+    networks: [tools, egress]
+
+networks:
+  egress: {}

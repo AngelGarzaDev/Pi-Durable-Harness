@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pi Durable</title>
+<style>
+:root { color-scheme: dark; --bg: #16181d; --panel: #1e2128; --border: #343844; --text: #e4e6eb; --muted: #8b90a0; --user: #8ab4f8; --call-fg: #f0c674; --call-bg: #2e2818; --result-fg: #9ccc65; --result-bg: #1f2a1a; --error-fg: #ef8a8a; --error-bg: #2e1c1c; --accent: #2d3340; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; }
+#chats { width: 15rem; flex: 0 0 15rem; border-right: 1px solid var(--border); padding: .75rem; overflow-y: auto; background: var(--panel); }
+#chats h2 { font-size: .85rem; color: var(--muted); margin: .25rem 0 .5rem; text-transform: uppercase; letter-spacing: .05em; }
+#chats button.chat { display: block; width: 100%; text-align: left; margin: .15rem 0; padding: .4rem .5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#chats button.chat.child { padding-left: 1.2rem; font-size: .9rem; }
+#chats button.chat.active { background: #3a4150; border-color: #5b6376; }
+#main { flex: 1; min-width: 0; padding: 1rem 1.25rem; display: flex; flex-direction: column; }
+#top { display: flex; align-items: baseline; gap: 1rem; }
+h1 { font-size: 1.3rem; margin: 0; }
+#status { color: var(--muted); font-size: .9rem; }
+#settings { margin: .75rem 0; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: .9rem; }
+#settings select, #settings input { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .3rem; }
+#settings input { width: 9rem; }
+#settings-msg { color: var(--muted); }
+#transcript { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-y: auto; white-space: pre-wrap; background: var(--panel); min-height: 12rem; }
+.user, .assistant { margin: .5rem 0; }
+.user { color: var(--user); }
+.assistant { color: var(--text); }
+.tool-call, .tool-result, .tool-error { font-family: ui-monospace, monospace; font-size: .85rem; margin: .3rem 0; padding: .2rem .4rem; border-radius: 4px; }
+.tool-call { color: var(--call-fg); background: var(--call-bg); }
+.tool-result { color: var(--result-fg); background: var(--result-bg); }
+.tool-error { color: var(--error-fg); background: var(--error-bg); }
+.other { color: var(--muted); font-size: .8rem; }
+.branch { font-size: .75rem; padding: .1rem .4rem; margin-left: .5rem; vertical-align: middle; }
+form.bar { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+input { font: inherit; }
+#msg { flex: 1; min-width: 12rem; padding: .5rem; font-size: 1rem; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
+button { font: inherit; background: var(--accent); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .4rem .8rem; cursor: pointer; }
+button:hover { background: #3a4150; }
+#actions { display: flex; gap: .5rem; margin-top: .5rem; flex-wrap: wrap; }
+</style>
+<aside id="chats">
+  <h2>Chats</h2>
+  <button type="button" id="new">+ New chat</button>
+  <div id="chatlist"></div>
+</aside>
+<div id="main">
+  <div id="top">
+    <h1 id="title">Pi Durable</h1>
+    <span id="status">connecting… · <a href="/logout" style="color:inherit">sign out</a></span>
+  </div>
+  <form id="settings">
+    <label>Model <select id="model"></select></label>
+    <label>Compact at <input id="limit" type="number" step="1000"> tokens</label>
+    <label>Max tool rounds <input id="maxturns" type="number" min="1" step="1" style="width:6rem"></label>
+    <button type="submit">Apply</button> <span id="settings-msg"></span>
+  </form>
+  <div id="transcript"></div>
+  <form id="f" class="bar">
+    <input id="msg" autofocus placeholder="Type a message">
+    <button id="send" title="Waits until Claude finishes the current answer">Send</button>
+    <button type="button" id="steer" title="Joins the answer now, after the current step">Steer</button>
+  </form>
+  <div id="actions">
+    <button type="button" id="stop">Abort</button>
+    <button type="button" id="compact" title="Summarize older messages to free up room">Compact</button>
+    <button type="button" id="reset" title="Start a fresh context. Old messages stay visible but Claude stops seeing them.">New context</button>
+  </div>
+</div>
+<script src="app.js"></script>
