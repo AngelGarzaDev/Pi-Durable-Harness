@@ -21,7 +21,6 @@ None open. Everything is committed (HEAD: `git log -1`). Goal 5 documentation au
 - Test chats and their workspace files from earlier work remain; not deleted without approval.
 
 ## Needs you
-- Delete /tmp/durable-web-orig-git-backup (old unscrubbed history) when satisfied with the new history.
 - Second host user check not possible here (PLAN 5.2).
 
 ## Next steps
