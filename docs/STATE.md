@@ -27,6 +27,7 @@ pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
 - Goal 5.2 needs a second user account (not possible here).
 
 ## Needs you
+- TO TEST LATER (user request m00596): in the real browser, use the Anthropic key row (save a key, see "entered in browser", remove it) and the question card from goal 6. Only WS paths and served files are checked so far.
 - Approve or reject the earlier push to origin (goal 6) and any future pushes.
 - Delete test chats/workspace files (listed above) if you want them gone.
 - Second account for goal 5.2 if you want that check.

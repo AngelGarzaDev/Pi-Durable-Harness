@@ -19,6 +19,7 @@
     "@earendil-works/chord": "^1.6.0",
     "@earendil-works/pi-ai": "^1.6.0",
     "@earendil-works/pi-durable": "^1.6.0",
+    "@earendil-works/pi-mcp": "1.6.0",
     "tsx": "^4.23.15",
     "ws": "^8.23.0"
   },

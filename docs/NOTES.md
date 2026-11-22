@@ -100,3 +100,8 @@
 - Key never leaves the server: auth-status / auth-set replies carry only source and last four characters. Format check only (sk-ant- prefix, length 20–300, no spaces); no live call.
 - Tests: tests/credentials.test.ts (5), tests/http.test.ts auth WS test. Suite 62 passing, typecheck clean.
 - UI: key row under the settings bar (password field, Save key, Remove browser key). Checked with node --check and curl; not clicked in a real browser (no token in tool calls).
+
+## 2026-11-22 goal 8.1: MCP dependency and config
+- Pinned @earendil-works/pi-mcp 1.6.0 exact (npm install --save-exact). Its config types and validateMcpServerConfig are used for each entry; app adds name rules and "exactly one of command or url" (Pi's validator alone accepts both).
+- Config file: DATA_DIR/mcp.json, Pi's mcpServers shape, mode 600, written atomically. src/mcp-config.ts; tests/mcp-config.test.ts (6 tests). Env values and headers are NOT expanded (no ${VAR} substitution yet); a decision for 8.3 since it touches secrets.
+- Surprise: npm install printed "install-scripts" warnings; no install scripts are needed by this package (deps: cross-spawn only).
