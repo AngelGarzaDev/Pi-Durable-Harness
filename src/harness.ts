@@ -10,7 +10,7 @@ import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite
 import type { Config } from "./config.js";
 import { INSTRUCTIONS } from "./prompt.js";
 import { checkSettings, compactionFor, defaultSettings, loadSettings, type ChatSettings, type ModelInfo } from "./settings.js";
-import { readApiKey } from "./config.js";
+import { readApiKey, readRunnerToken } from "./config.js";
 import { ReviewSettings, reviewExtension } from "./review.js";
 
 export const context = BACKGROUND_CONTEXT;
@@ -31,6 +31,7 @@ function withoutMessageThreads<T extends Provider<"anthropic-messages">>(base: T
 export async function openHarness(config: Config) {
 	mkdirSync(config.dataDir, { recursive: true });
 	const apiKey = readApiKey(config.apiKeyFile);
+	const runnerToken = readRunnerToken(config.runnerTokenFile);
 	// pi-ai's Anthropic provider reads ANTHROPIC_API_KEY from the environment; it stays in this process only.
 	process.env.ANTHROPIC_API_KEY = apiKey;
 	const models = createModels();
@@ -44,7 +45,7 @@ export async function openHarness(config: Config) {
 	const harness = await Harness.open(storage, {
 		models,
 		registry,
-		env: () => new RemoteExecutionEnv(config.runnerUrl, "/workspace"),
+		env: () => new RemoteExecutionEnv(config.runnerUrl, runnerToken, "/workspace"),
 	}, context);
 	// Saved settings win over the env default. An unusable saved setting falls back to the default.
 	const saved = loadSettings(config.dataDir);

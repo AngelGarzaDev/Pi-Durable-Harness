@@ -18,11 +18,12 @@ before(async () => {
 	const dir = mkdtempSync(join(tmpdir(), "pdw-http-"));
 	writeFileSync(join(dir, "key"), "sk-ant-test-not-real\n");
 	writeFileSync(join(dir, "token"), TOKEN + "\n");
+	writeFileSync(join(dir, "runner_token"), "r".repeat(48) + "\n");
 	child = spawn(process.execPath, ["--import", "tsx", "src/server.ts"], {
 		cwd: join(import.meta.dirname, ".."),
 		env: {
 			...process.env, HOST: "127.0.0.1", PORT: String(PORT), DATA_DIR: join(dir, "data"),
-			ANTHROPIC_API_KEY_FILE: join(dir, "key"), APP_TOKEN_FILE: join(dir, "token"), RUNNER_URL: "http://127.0.0.1:9",
+			ANTHROPIC_API_KEY_FILE: join(dir, "key"), APP_TOKEN_FILE: join(dir, "token"), RUNNER_TOKEN_FILE: join(dir, "runner_token"), RUNNER_URL: "http://127.0.0.1:9",
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});

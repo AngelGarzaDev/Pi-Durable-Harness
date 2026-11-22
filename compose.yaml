@@ -18,7 +18,8 @@ services:
       RUNNER_URL: http://runner:7000
       ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
       APP_TOKEN_FILE: /run/secrets/app_token
-    secrets: [anthropic_api_key, app_token]
+      RUNNER_TOKEN_FILE: /run/secrets/runner_token
+    secrets: [anthropic_api_key, app_token, runner_token]
     volumes: ["app-data:/data"]
     ports: ["127.0.0.1:8787:8787"]
     networks: [edge, tools]
@@ -43,6 +44,8 @@ services:
       RUNNER_HOST: 0.0.0.0
       RUNNER_PORT: "7000"
       WORKSPACE_DIR: /workspace
+      RUNNER_TOKEN_FILE: /run/secrets/runner_token
+    secrets: [runner_token]
     volumes: ["workspace:/workspace"]
     networks: [tools]
     healthcheck:
@@ -60,6 +63,8 @@ secrets:
     file: ./secrets/anthropic_api_key
   app_token:
     file: ./secrets/app_token
+  runner_token:
+    file: ./secrets/runner_token
 
 volumes:
   app-data: {}

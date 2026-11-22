@@ -35,3 +35,12 @@
 - SECURE_COOKIES=1 adds the Secure flag for HTTPS deployments. Off by default because the default install serves plain HTTP on 127.0.0.1.
 - Sessions still never expire; the cookie is derived from the token, so rotating the token is the only revoke (review F5, accepted for now, recorded).
 - Test: tests/http.test.ts starts the real server in a child process (no model call; runner URL points at a closed port).
+
+## 2026-11-22 Goal 4.2: runner hardening
+- Runner requires `Authorization: Bearer <runner_token>` on every route except GET /healthz (review F2). Token file: secrets/runner_token (gitignored, 64 hex chars from openssl rand -hex 32), mounted as Docker secret runner_token in both containers; env RUNNER_TOKEN_FILE. Missing or short (<32) token = startup error.
+- Path check moved to runner/guard.ts insideRoot: walks to nearest existing ancestor and realpaths it; dangling symlinks are refused (review F3). Non-string paths return code "invalid" (F4).
+- Method names checked with Object.hasOwn (F17). Request body capped at 16 MiB (413, connection closed) (F16).
+- App side: RemoteExecutionEnv sends the bearer token; non-exec calls time out after 30 s (F19). Exec streams with no timeout; the command's own timeout still applies.
+- Runner 500 responses no longer carry the raw error text; it is logged on the server (F11).
+- Tests: tests/runner-guard.test.ts (unit) and tests/runner-http.test.ts (starts runner/server.ts as child; auth, 413, symlink escape, non-string path, prototype method names).
+- Surprise: fetch (undici) reuses a keep-alive socket that the server destroyed after an oversized upload, which showed as ECONNRESET on the next test. Fixed by sending 413 with connection: close before destroying the request.

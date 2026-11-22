@@ -8,6 +8,7 @@ export interface Config {
 	apiKeyFile: string;
 	model: string;
 	runnerUrl: string;
+	runnerTokenFile: string;
 	tokenFile: string;
 }
 
@@ -19,8 +20,16 @@ export function loadConfig(env = process.env): Config {
 		apiKeyFile: env.ANTHROPIC_API_KEY_FILE ?? "/run/secrets/anthropic_api_key",
 		model: env.ANTHROPIC_MODEL ?? "claude-haiku-5-5",
 		runnerUrl: env.RUNNER_URL ?? "http://127.0.0.1:7000",
+		runnerTokenFile: env.RUNNER_TOKEN_FILE ?? "/run/secrets/runner_token",
 		tokenFile: env.APP_TOKEN_FILE ?? "/run/secrets/app_token",
 	};
+}
+
+// Shared secret the app sends to the runner. Read once at startup, never logged.
+export function readRunnerToken(path: string): string {
+	const token = readFileSync(path, "utf8").trim();
+	if (token.length < 32) throw new Error(`Runner token at ${path} is missing or too short (need at least 32 characters)`);
+	return token;
 }
 
 // Reads the key once at startup. Returns the trimmed value and never logs it.

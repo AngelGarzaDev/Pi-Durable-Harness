@@ -35,17 +35,19 @@ const notSupported = (name: string) => async (..._args: any[]): Promise<any> =>
 export class RemoteExecutionEnv implements ExecutionEnv {
 	readonly id: string;
 	cwd: string;
-	constructor(private readonly baseUrl: string, cwd = "/workspace") {
+	constructor(private readonly baseUrl: string, private readonly token: string, cwd = "/workspace") {
 		this.id = `runner:${baseUrl}`;
 		this.cwd = cwd;
 	}
 
 	private async post<T>(path: string, body: unknown, context?: Context): Promise<Wire<T>> {
+		// Non-exec calls time out after 30 s. Exec streams, so it has no timeout here (the command's own timeout applies).
+		const timeout = AbortSignal.timeout(30_000);
 		const response = await fetch(`${this.baseUrl}${path}`, {
 			method: "POST",
-			headers: { "content-type": "application/json" },
+			headers: { "content-type": "application/json", authorization: `Bearer ${this.token}` },
 			body: JSON.stringify(body),
-			signal: context?.abortSignal,
+			signal: context?.abortSignal ? AbortSignal.any([context.abortSignal, timeout]) : timeout,
 		});
 		if (!response.ok) throw new Error(`runner ${path} returned HTTP ${response.status}`);
 		return (await response.json()) as Wire<T>;
@@ -88,7 +90,7 @@ export class RemoteExecutionEnv implements ExecutionEnv {
 		try {
 			const response = await fetch(`${this.baseUrl}/v1/exec`, {
 				method: "POST",
-				headers: { "content-type": "application/json" },
+				headers: { "content-type": "application/json", authorization: `Bearer ${this.token}` },
 				body: JSON.stringify({ command, options: { ...rest, onOutput: undefined } }),
 				signal: controller.signal,
 			});

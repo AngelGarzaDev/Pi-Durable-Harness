@@ -1,9 +1,9 @@
 // Runner: executes the agent's file and shell operations. It holds NO credentials and only sees WORKSPACE.
 // Runs in its own container in production; the app reaches it over an internal network only.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { realpathSync } from "node:fs";
-import { dirname, resolve, sep } from "node:path";
+import { readFileSync, realpathSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { bearerMatches, insideRoot } from "./guard.js";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import { ExecutionError, FileError, type BinaryReader, type Result } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
@@ -14,6 +14,10 @@ const PORT = Number(process.env.RUNNER_PORT ?? 7000);
 const HOST = process.env.RUNNER_HOST ?? "0.0.0.0";
 const env = new NodeExecutionEnv({ cwd: WORKSPACE });
 const HANDLE_IDLE_MS = 60_000;
+const MAX_BODY = 16 * 1024 * 1024;
+// Shared secret with the app. Without it any container on the internal network could run shell commands.
+const RUNNER_TOKEN = readFileSync(process.env.RUNNER_TOKEN_FILE ?? "/run/secrets/runner_token", "utf8").trim();
+if (RUNNER_TOKEN.length < 32) throw new Error("runner token file is missing or too short (need at least 32 characters)");
 
 // Methods the app may call on the environment. Anything else is refused.
 const CALLS: Record<string, (...args: any[]) => Promise<Result<unknown, unknown>>> = {
@@ -36,14 +40,8 @@ function toHost(path: string): string {
 	if (path.startsWith(VIRTUAL_ROOT + "/")) return ROOT + path.slice(VIRTUAL_ROOT.length);
 	return path;
 }
-function insideWorkspace(path: string): boolean {
-	const abs = resolve(ROOT, toHost(path));
-	let probe = abs;
-	// Resolve the deepest existing ancestor so a symlink cannot point outside.
-	while (true) {
-		try { probe = realpathSync(probe); break; } catch { const parent = dirname(probe); if (parent === probe) return false; probe = parent; }
-	}
-	return probe === ROOT || probe.startsWith(ROOT + sep);
+function insideWorkspace(path: unknown): boolean {
+	return typeof path === "string" && insideRoot(ROOT, toHost(path));
 }
 function refusedOutside(path: string) {
 	return { ok: false, error: { kind: "file", code: "permission_denied", message: `path is outside the workspace: ${path}`, path } };
@@ -88,7 +86,12 @@ function decodeValue(v: unknown): unknown {
 
 async function readBody(req: IncomingMessage): Promise<any> {
 	const chunks: Buffer[] = [];
-	for await (const c of req) chunks.push(c as Buffer);
+	let size = 0;
+	for await (const c of req) {
+		size += (c as Buffer).length;
+		if (size > MAX_BODY) throw new Error("body too large");
+		chunks.push(c as Buffer);
+	}
 	return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 function send(res: ServerResponse, status: number, body: unknown) {
@@ -96,10 +99,13 @@ function send(res: ServerResponse, status: number, body: unknown) {
 }
 
 async function handleCall(body: { method: string; args: unknown[] }) {
+	if (typeof body.method !== "string" || !Object.hasOwn(CALLS, body.method)) {
+		return { ok: false, error: { kind: "file", code: "not_supported", message: `unknown method ${String(body.method)}` } };
+	}
 	const fn = CALLS[body.method];
-	if (!fn) return { ok: false, error: { kind: "file", code: "not_supported", message: `unknown method ${body.method}` } };
-	const args = body.args.map(decodeValue);
-	if (PATH_METHODS.has(body.method) && typeof args[0] === "string") {
+	const args = (Array.isArray(body.args) ? body.args : []).map(decodeValue);
+	if (PATH_METHODS.has(body.method)) {
+		if (typeof args[0] !== "string") return { ok: false, error: { kind: "file", code: "invalid", message: "path must be a string" } };
 		if (!insideWorkspace(args[0])) return refusedOutside(args[0]);
 		args[0] = toHost(args[0]);
 	}
@@ -107,7 +113,7 @@ async function handleCall(body: { method: string; args: unknown[] }) {
 }
 
 async function handleOpenReader(body: { path: string; options?: { noFollow?: boolean } }) {
-	if (!insideWorkspace(body.path)) return refusedOutside(body.path);
+	if (!insideWorkspace(body.path)) return refusedOutside(String(body.path));
 	const r = await env.openBinaryReader(toHost(body.path), body.options, BACKGROUND_CONTEXT);
 	if (!r.ok) return { ok: false, error: encodeError(r.error) };
 	const id = randomUUID();
@@ -142,6 +148,10 @@ async function handleExec(body: { command: string | string[]; options?: Record<s
 		res.end(JSON.stringify({ t: "done", result: refusedOutside(cwd) }) + "\n");
 		return;
 	}
+	if (!(typeof body.command === "string" || (Array.isArray(body.command) && body.command.every((c) => typeof c === "string")))) {
+		res.end(JSON.stringify({ t: "done", result: { ok: false, error: { kind: "exec", code: "invalid", message: "command must be a string or an array of strings" } } }) + "\n");
+		return;
+	}
 	const r = await env.exec(body.command, options as any, ctx);
 	const payload = r.ok ? { ok: true, value: r.value } : { ok: false, error: encodeError(r.error) };
 	res.end(JSON.stringify({ t: "done", result: payload }) + "\n");
@@ -152,6 +162,7 @@ createServer(async (req, res) => {
 	try {
 		const url = new URL(req.url ?? "/", "http://runner");
 		if (req.method === "GET" && url.pathname === "/healthz") return send(res, 200, { ok: true });
+		if (!bearerMatches(req.headers.authorization, RUNNER_TOKEN)) return send(res, 401, { error: "unauthorized" });
 		if (req.method !== "POST") return send(res, 405, { error: "method not allowed" });
 		if (url.pathname === "/v1/call") return send(res, 200, await handleCall(await readBody(req)));
 		if (url.pathname === "/v1/reader/open") return send(res, 200, await handleOpenReader(await readBody(req)));
@@ -159,7 +170,14 @@ createServer(async (req, res) => {
 		if (url.pathname === "/v1/exec") return await handleExec(await readBody(req), req, res);
 		return send(res, 404, { error: "not found" });
 	} catch (error) {
-		if (!res.headersSent) send(res, 500, { ok: false, error: { kind: "file", code: "unknown", message: String(error) } });
+		if (error instanceof Error && error.message === "body too large") {
+			// Close the connection: the rest of the oversized upload is not read.
+			if (!res.headersSent) res.writeHead(413, { "content-type": "application/json", connection: "close" }).end(JSON.stringify({ error: "body too large" }));
+			req.destroy();
+			return;
+		}
+		console.error("runner error:", error);
+		if (!res.headersSent) send(res, 500, { ok: false, error: { kind: "file", code: "unknown", message: "runner error" } });
 		else res.end();
 	}
 }).listen(PORT, HOST, () => console.log(`runner listening on ${HOST}:${PORT}, workspace ${WORKSPACE}`));
