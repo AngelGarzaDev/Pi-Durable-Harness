@@ -52,7 +52,7 @@ Storage: DATA_DIR/credentials.json, mode 600, owner the app user, inside the app
 Architecture follows Pi: client library @earendil-works/pi-mcp@1.6.0 (pinned exact, same as pi-durable; deps: cross-spawn only). Config format like Pi's mcp.json (mcpServers map, command/args/env/cwd or url/headers). Stdio servers run in the RUNNER (no credentials, workspace only). HTTP servers run in the APP (needs internet). Tool names mcp__<server>__<tool>.
 - [x] 8.1 Add pi-mcp dependency; config file DATA_DIR/mcp.json with validation (names [A-Za-z0-9_-], no duplicate names, exactly one of command/url). Tests for validation.
 - [x] 8.2 Runner endpoints: POST /mcp/start, /mcp/stop, GET /mcp/tools, POST /mcp/call (bearer-protected, body capped), stdio via StdioTransport. Tests in tests/runner-mcp.test.ts with a tiny stdio MCP fixture server.
-- [ ] 8.3 App: HTTP servers via StreamableHttpTransport; tool adapter to pi-durable tool registry (exposure direct|hidden; deferred and codemode not in first pass). Tests with an in-process HTTP fixture.
+- [x] 8.3 App: HTTP servers via StreamableHttpTransport; tool adapter to pi-durable tool registry (exposure direct|hidden; deferred and codemode not in first pass). Tests with an in-process HTTP fixture.
 - [ ] 8.4 WS messages `mcp-list`, `mcp-add`, `mcp-remove`, `mcp-reconnect` with status (state, tool count, error). Browser panel to list/add/remove.
 - [ ] 8.5 Live check: one stdio fixture server (no internet needed) then a haiku call that uses its tool (dev only, haiku-5-5, 100000 limit). Log in NOTES.md.
 - [ ] 8.6 Not in first pass (record in NOTES): OAuth for remote servers, deferred/codemode exposure, project-level config, /login-style MCP sign-in.

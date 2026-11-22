@@ -113,3 +113,13 @@
 - Risk to remember: anyone who can add a server can run its command inside the runner container (workspace volume only, no credentials). The runner has no secrets by design; keep it that way.
 - Test fixture: tests/fixtures/mcp-echo-server.mjs; tests/runner-mcp.test.ts (4 tests).
 - Bug found by test: a relative cwd was refused and then start reported "server is not running". Fixed: relative cwd is resolved against the workspace root.
+
+## 2026-11-22 goal 8.3: app side MCP (src/mcp.ts, McpManager)
+- One pi-durable extension per server, named mcp:<server>; tools mcp__<server>__<tool>. exposure hidden → callers ["tools"], otherwise ["model"]. deferred and codemode exposure are NOT in this pass.
+- http servers: StreamableHttpTransport + McpClient inside the app. stdio servers: via runner /v1/mcp/*.
+- Headers are sent literally; ${VAR} expansion is not done (first pass).
+- Surprise: Registry has no tools() method; use registry.snapshot().tools() → [{extension, tool}].
+- Surprise: pi-schema unsafe() needs a Record<string, unknown>, not `object`.
+- A failed server is recorded in mcp.list() with state "error"; start() never throws. Tests: tests/mcp-http.test.ts (2), in-process HTTP fixture.
+- Not covered by a test yet: app-side stdio path end to end (covered by runner-mcp.test.ts only). Live check is 8.5.
+- Not yet verified: whether a chat that is already open sees a server added later. Check in 8.4 / 8.5.

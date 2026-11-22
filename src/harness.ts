@@ -14,6 +14,7 @@ import { readApiKey, readOptionalApiKey, readRunnerToken } from "./config.js";
 import { ReviewSettings, reviewExtension } from "./review.js";
 import { askExtension } from "./ask.js";
 import { FileCredentialStore } from "./credentials.js";
+import { McpManager } from "./mcp.js";
 
 export const context = BACKGROUND_CONTEXT;
 
@@ -50,6 +51,9 @@ export async function openHarness(config: Config) {
 	registry.install(reviewExtension(reviews));
 	// ask_user: the model asks the person a question; the browser answers (see src/ask.ts).
 	registry.install(askExtension);
+	// MCP servers from DATA_DIR/mcp.json. Failures are recorded per server (see mcp.list()), never thrown here.
+	const mcp = new McpManager(registry, join(config.dataDir, "mcp.json"), config.runnerUrl, runnerToken);
+	const mcpErrors = await mcp.start();
 	const harness = await Harness.open(storage, {
 		models,
 		registry,
@@ -66,7 +70,7 @@ export async function openHarness(config: Config) {
 	});
 	await applySettings(root, models, settings);
 	harness.resume(); // continue any run the last process left unfinished
-	return { harness, root, models, settings, reviews, credentials, secretKey: secretKey !== undefined };
+	return { harness, root, models, settings, reviews, credentials, secretKey: secretKey !== undefined, mcp, mcpErrors };
 }
 
 // Chat models the browser can pick, from the pi-ai catalog.
