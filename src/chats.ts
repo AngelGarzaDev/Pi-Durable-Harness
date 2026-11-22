@@ -26,3 +26,15 @@ export function titleFrom(text: string): string {
 	const oneLine = text.replace(/\s+/g, " ").trim();
 	return oneLine.length > 60 ? `${oneLine.slice(0, 57)}...` : oneLine;
 }
+
+// Collects every item from a cursor-paged scan. `fetch` gets the cursor from the previous page (undefined for the first).
+export async function collectPages<T, C>(fetch: (cursor: C | undefined) => Promise<{ readonly items: readonly T[]; readonly next?: C }>): Promise<T[]> {
+	const all: T[] = [];
+	let cursor: C | undefined;
+	do {
+		const page = await fetch(cursor);
+		all.push(...page.items);
+		cursor = page.next;
+	} while (cursor !== undefined);
+	return all;
+}

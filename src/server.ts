@@ -8,8 +8,8 @@ import { loadConfig } from "./config.js";
 import { SESSION_COOKIE, isAuthed, readAccessToken, sessionValue, tokenMatches } from "./auth.js";
 import { applySettings, context, listModels, modelInfo, openHarness } from "./harness.js";
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
-import type { Conversation, ConversationId, ConversationWatch, EntryId } from "@earendil-works/pi-durable";
-import { loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
+import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId } from "@earendil-works/pi-durable";
+import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
 import { LoginLimiter, SECURITY_HEADERS, errorRef, originAllowed } from "./guard.js";
 
 type ClientMessage =
@@ -132,9 +132,15 @@ function settingsPayload() {
 	return { type: "settings", settings, models: listModels(models), contextWindow: info?.contextWindow ?? 0 };
 }
 
+// Every chat, following the cursor past the 200-row page size (review F10: the list used to stop at 200).
+async function allConversations(): Promise<ConversationRecord[]> {
+	return collectPages<ConversationRecord, Cursor>((cursor) =>
+		harness.commit(async (tx) => tx.scanConversations({}, 200, cursor), context));
+}
+
 // All chats in the harness, with titles and the fork parent. The root chat is listed too.
 async function chatList(): Promise<{ type: "chats"; chats: { id: number; title: string; parentId?: number }[] }> {
-	const records = await harness.commit(async (tx) => (await tx.scanConversations({}, 200)).items, context);
+	const records = await allConversations();
 	const chats = records.map((r) => ({
 		id: r.id,
 		title: titles[String(r.id)] ?? (r.id === root.id ? "Main chat" : "Chat"),
@@ -145,7 +151,7 @@ async function chatList(): Promise<{ type: "chats"; chats: { id: number; title: 
 
 // Applies the saved settings to every chat, so a model or limit change covers all of them.
 async function applyToAll(next: ChatSettings) {
-	const records = await harness.commit(async (tx) => (await tx.scanConversations({}, 200)).items, context);
+	const records = await allConversations();
 	for (const r of records) {
 		const conv = await harness.conversation(r.id, context);
 		if (conv) await applySettings(conv, models, next);
