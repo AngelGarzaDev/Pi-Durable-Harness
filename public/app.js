@@ -1,5 +1,6 @@
 // Browser client: chat list, transcript, settings, and chat actions (send, steer, fork, reset, compact).
 import { reviewLine, isReviewContinuation } from "./review-view.js";
+import { answerMessage, questionHint } from "./ask-view.js";
 const ws = new WebSocket(`ws://${location.host}/ws`);
 const out = document.getElementById("transcript");
 const status = document.getElementById("status");
@@ -43,6 +44,62 @@ function showNotice(text) {
 	const el = document.getElementById("notice");
 	el.textContent = text ?? "";
 	el.hidden = !text;
+}
+
+// Question cards above the form: one per open ask_user question. Keys already answered stay disabled until the view drops them.
+const answered = new Set();
+let lastQuestions = [];
+const questionsEl = document.getElementById("questions");
+function renderQuestions(questions) {
+	questionsEl.textContent = "";
+	for (const q of questions ?? []) {
+		const card = document.createElement("div");
+		card.className = "question";
+		const text = document.createElement("div");
+		text.className = "question-text";
+		text.textContent = q.question;
+		const hint = document.createElement("div");
+		hint.className = "question-hint";
+		hint.textContent = questionHint(q);
+		const choices = document.createElement("div");
+		choices.className = "question-options";
+		const field = document.createElement("div");
+		field.className = "question-own";
+		const input = document.createElement("input");
+		input.type = "text";
+		input.maxLength = 2000;
+		input.placeholder = "Your own answer";
+		const send = document.createElement("button");
+		send.textContent = "Send answer";
+		const note = document.createElement("div");
+		note.className = "question-note";
+		const sendAnswer = (text) => {
+			const msg = answerMessage(q, text);
+			if (!msg) return;
+			answered.add(q.key);
+			ws.send(JSON.stringify(msg));
+			note.textContent = "Sent.";
+			card.classList.add("done");
+			for (const el of card.querySelectorAll("button, input")) el.disabled = true;
+		};
+		for (const option of q.options ?? []) {
+			const b = document.createElement("button");
+			b.className = "option";
+			b.textContent = option;
+			b.onclick = () => sendAnswer(option);
+			choices.appendChild(b);
+		}
+		send.onclick = () => sendAnswer(input.value);
+		input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); sendAnswer(input.value); } };
+		field.append(input, send);
+		card.append(text, hint, choices, field, note);
+		if (answered.has(q.key)) {
+			card.classList.add("done");
+			for (const el of card.querySelectorAll("button, input")) el.disabled = true;
+			note.textContent = "Sent.";
+		}
+		questionsEl.appendChild(card);
+	}
 }
 
 function render(entries) {
@@ -92,6 +149,14 @@ ws.onmessage = (e) => {
 		render(msg.view.entries);
 		showNotice(msg.notice);
 		showReview(msg.review);
+		lastQuestions = msg.questions ?? [];
+		renderQuestions(lastQuestions);
+	} else if (msg.type === "answer-result") {
+		if (!msg.ok) {
+			answered.delete(msg.key);
+			status.textContent = msg.error;
+			renderQuestions(lastQuestions);
+		}
 	} else if (msg.type === "review") {
 		showReview(msg);
 		settingsMsg.textContent = msg.on ? "Review is on for this chat." : "Review is off for this chat.";

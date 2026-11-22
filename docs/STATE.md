@@ -2,27 +2,29 @@
 
 ## Summary
 pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
-- Goals 1-3 done: turn-limit notice, steer timing (tests + tooltip), answer review (per-chat, reviewer model, settings.json).
-- Goal 4 done: public-release hardening, AGPL-3.0-or-later, README quick start, SECURITY.md, history scrubbed.
-- Containers run as the invoking host user's uid (setup-secrets.sh writes .env). Secrets stay mode 600.
-- Deployed and healthy. Login, cookie gate, and WebSocket origin check verified (see NOTES 2026-11-22 verification).
+- Goals 1-5 done (turn-limit notice, steer timing, answer review, production hardening, README audit). 5.2 blocked (needs second account).
+- Goal 6 (ask the user a question: option buttons plus own answer) is built and tested: tool `ask_user` parks on a signal (src/ask.ts), WS `answer` message (src/server.ts), question cards (public/app.js, public/ask-view.js). Suite: 56 tests pass.
 
 ## Current task
-None open. Everything is committed (HEAD: `git log -1`). Goal 5 documentation audit done except 5.2.
+- Goal 6, steps 6.4 (live check with claude-haiku-5-5, 100000 token limit, one question, click an option; log cost in NOTES) and 6.5 (docker compose up -d --build, healthz ok).
+
+## Next step
+1. Docker redeploy: `docker compose up -d --build` in durable-web/, then `curl -s http://127.0.0.1:8787/healthz` should print ok.
+2. Live check in browser (agent_browser or manual): new chat, ask the model to ask a question with options, click an option, confirm the answer appears and the model replies. Record in docs/NOTES.md.
+3. Tick 6.4 and 6.5 in docs/PLAN.md.
 
 ## How to run and test
-- Setup: `./scripts/setup-secrets.sh`, then `docker compose up -d --build`, then `curl -s http://127.0.0.1:8787/healthz` (prints ok).
-- Tests: `npm run typecheck && npm test` (51 tests).
-- Live model calls cost money: scripts/live-review-checks.mjs and scripts/live-chat-review.mjs. Use claude-haiku-5-5 only (limit 100000) unless the user approves more.
+- Typecheck: `npm run typecheck`. Tests: `npm test` (node:test, spawns real server on random port).
+- Dev without Docker: see README (ports 8788 / 7101 to avoid the Docker stack on 8787).
 
-## Known limits (accepted, see SECURITY.md)
-- Sessions never expire; logout does not revoke the cookie (review F5).
-- Runner shares the host uid (SECURITY.md "Container user").
-- Test chats and their workspace files from earlier work remain; not deleted without approval.
+## Known failures / watch
+- Old test chats and files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt) still exist; do not delete without approval.
+- Goal 5.2 needs a second user account (not possible here).
 
 ## Needs you
-- Second host user check not possible here (PLAN 5.2).
+- Delete test chats/workspace files (listed above) if you want them gone.
+- Second account for goal 5.2 if you want that check.
 
-## Next steps
-1. Done: pushed to https://github.com/AngelGarzaDev/Pi-Durable-Harness.git (main). Future pushes: see AGENTS.md "Pushing".
-2. Optional: work through docs/REVIEW-2026-11-22.md items not yet fixed (F5, F6 Secure flag, F23).
+## Decisions
+- Question timeout 24 h; after it the tool returns an error result ("did not answer in time").
+- Only a question open in the chat on the sending socket can be answered.

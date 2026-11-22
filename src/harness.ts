@@ -12,6 +12,7 @@ import { INSTRUCTIONS } from "./prompt.js";
 import { checkSettings, compactionFor, defaultSettings, loadSettings, type ChatSettings, type ModelInfo } from "./settings.js";
 import { readApiKey, readRunnerToken } from "./config.js";
 import { ReviewSettings, reviewExtension } from "./review.js";
+import { askExtension } from "./ask.js";
 
 export const context = BACKGROUND_CONTEXT;
 
@@ -42,6 +43,8 @@ export async function openHarness(config: Config) {
 	// Answer review: installed for all chats, but it only acts in chats that have it switched on (reviews.json).
 	const reviews = new ReviewSettings(config.dataDir);
 	registry.install(reviewExtension(reviews));
+	// ask_user: the model asks the person a question; the browser answers (see src/ask.ts).
+	registry.install(askExtension);
 	const harness = await Harness.open(storage, {
 		models,
 		registry,

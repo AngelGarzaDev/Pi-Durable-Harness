@@ -115,6 +115,27 @@ test("WebSocket without a session cookie is refused", async () => {
 	assert.notEqual(result, "open");
 });
 
+test("WebSocket: an answer to a question that is not open is refused, not delivered", async () => {
+	const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { headers: { cookie, origin: `http://127.0.0.1:${PORT}` } });
+	await new Promise<void>((resolve, reject) => { ws.on("open", () => resolve()); ws.on("error", reject); });
+	const messages: { type: string; ok?: boolean; error?: string }[] = [];
+	ws.on("message", (d) => messages.push(JSON.parse(String(d))));
+	ws.send(JSON.stringify({ type: "answer", taskId: 999, key: "nope", text: "Blue" }));
+	const result = await new Promise<{ type: string; ok?: boolean; error?: string }>((resolve, reject) => {
+		const end = Date.now() + 5000;
+		const tick = () => {
+			const found = messages.find((m) => m.type === "answer-result");
+			if (found) return resolve(found);
+			if (Date.now() > end) return reject(new Error("no answer-result"));
+			setTimeout(tick, 20);
+		};
+		tick();
+	});
+	assert.equal(result.ok, false);
+	assert.equal(result.error, "That question is no longer open.");
+	ws.close();
+});
+
 test("wrong tokens are refused, then the address is locked out with 429 and Retry-After", async () => {
 	// Every attempt counts, including the 413 above, so only four wrong tokens get a 401 before the lockout.
 	const statuses: number[] = [];

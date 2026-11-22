@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { failureNotice } from "./notice.js";
+import { AnswerSignal, checkAnswer, pendingQuestions } from "./ask.js";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,7 @@ import { loadConfig } from "./config.js";
 import { SESSION_COOKIE, isAuthed, readAccessToken, sessionValue, tokenMatches } from "./auth.js";
 import { applySettings, context, listModels, modelInfo, openHarness } from "./harness.js";
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
-import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId } from "@earendil-works/pi-durable";
+import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
 import { LoginLimiter, SECURITY_HEADERS, errorRef, originAllowed } from "./guard.js";
 
@@ -22,7 +23,9 @@ type ClientMessage =
 	| { type: "list" }
 	| { type: "open"; conversationId: number }
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
-	| { type: "review"; on?: boolean; reviewerModel?: string };
+	| { type: "review"; on?: boolean; reviewerModel?: string }
+	// An answer to a question the model asked (ask_user). taskId and key must match a question shown in the open chat.
+	| { type: "answer"; taskId: number; key: string; text: string };
 
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
@@ -32,7 +35,7 @@ const titles: Titles = loadTitles(config.dataDir);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 // Only these files are served. Nothing else under public/ is reachable.
-const PUBLIC_FILES = new Set(["index.html", "login.html", "app.js", "login.js", "review-view.js"]);
+const PUBLIC_FILES = new Set(["index.html", "login.html", "app.js", "login.js", "review-view.js", "ask-view.js"]);
 
 // Only these are reachable without the session cookie: health check, login page and its script.
 const OPEN_PATHS = new Set(["/healthz", "/login", "/login.html", "/login.js"]);
@@ -178,10 +181,10 @@ wss.on("connection", async (socket: WebSocket) => {
 		active = conv;
 		watch = await conv.watch(context);
 		watch.start(async (call) => {
-			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id) });
+			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id), questions: pendingQuestions(call.value.docs) });
 			else send({ type: "error", message: publicError(call) });
 		});
-		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id) });
+		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id), questions: pendingQuestions(watch.value.docs) });
 		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat") });
 	};
 	try {
@@ -259,6 +262,16 @@ wss.on("connection", async (socket: WebSocket) => {
 					patch.reviewerModel = id === "" ? null : id;
 				}
 				send({ type: "review", conversationId: active.id, ...reviews.update(active.id, patch) });
+			} else if (msg.type === "answer") {
+				// Only a question that is open in the chat on this socket can be answered. The answer goes to the parked tool call.
+				const open = pendingQuestions(watch?.value.docs);
+				const question = open.find((q) => q.taskId === msg.taskId && q.key === msg.key);
+				if (!question) return send({ type: "answer-result", ok: false, taskId: msg.taskId, key: msg.key, error: "That question is no longer open." });
+				const checked = checkAnswer(msg.text);
+				if (!checked.ok) return send({ type: "answer-result", ok: false, taskId: msg.taskId, key: msg.key, error: checked.error });
+				const result = await harness.signal(msg.taskId as unknown as TaskId, AnswerSignal, msg.key, { text: checked.text }, context);
+				if (result === "delivered") send({ type: "answer-result", ok: true, taskId: msg.taskId, key: msg.key });
+				else send({ type: "answer-result", ok: false, taskId: msg.taskId, key: msg.key, error: "The question was already answered or has closed." });
 			} else if (msg.type === "compact") {
 				await active.compact(typeof msg.instructions === "string" ? msg.instructions : undefined, context);
 			} else {

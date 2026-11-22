@@ -31,3 +31,11 @@ Source: independent read-only review (findings numbered as in that review; full 
 ## Goal 5: documentation audit
 - [x] 5.1 Every progress item has a NOTES entry, PLAN tick and STATE update (2026-11-22).
 - [ ] 5.2 Second real host user check (needs a second account; not possible on this host).
+
+## Goal 6: ask the user a question (started 2026-11-22)
+User request: the harness presents a question; the user clicks an answer or types their own.
+- [x] 6.1 `ask_user` tool (src/ask.ts): parks on the `app.answer` signal, keyed by a memoized id; answer or timeout (24 h) on wake. Tests in tests/ask.test.ts (end to end with the faux provider: park, deliver, model gets answer, second delivery refused).
+- [x] 6.2 Server: pendingQuestions() in every view; WS `answer` message checked against the open chat's questions, then harness.signal; `answer-result` reply. Test in tests/http.test.ts.
+- [x] 6.3 Browser: question cards above the transcript (option buttons, own-answer field, Enter to send), public/ask-view.js helpers.
+- [ ] 6.4 Live check with claude-haiku-5-5 at 100000 tokens (one question, click an option). Log cost in NOTES.md.
+- [ ] 6.5 Deploy: docker compose up -d --build, healthz ok.

@@ -29,6 +29,13 @@ h1 { font-size: 1.3rem; margin: 0; }
 .tool-error { color: var(--error-fg); background: var(--error-bg); }
 .other { color: var(--muted); font-size: .8rem; }
 .review { color: var(--muted); font-size: .85rem; border-left: 2px solid var(--muted); padding-left: .5rem; margin: .4rem 0; white-space: pre-wrap; }
+.question { background: #1b2a3a; border: 1px solid #2f4d6b; border-radius: 6px; padding: .6rem .8rem; margin: .5rem 0; }
+.question.done { opacity: .6; }
+.question-text { font-weight: 600; margin-bottom: .2rem; }
+.question-hint, .question-note { color: #9aa7b4; font-size: .85em; }
+.question-options { display: flex; flex-wrap: wrap; gap: .4rem; margin: .4rem 0; }
+.question-own { display: flex; gap: .4rem; }
+.question-own input { flex: 1; }
 .notice { color: #f0c674; background: #2e2818; border: 1px solid #5b4a1e; border-radius: 4px; padding: .4rem .6rem; margin: .5rem 0; }
 .branch { font-size: .75rem; padding: .1rem .4rem; margin-left: .5rem; vertical-align: middle; }
 form.bar { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
@@ -56,6 +63,7 @@ button:hover { background: #3a4150; }
     <button type="submit">Apply</button> <span id="settings-msg"></span>
   </form>
   <div id="notice" class="notice" hidden></div>
+  <div id="questions"></div>
   <div id="transcript"></div>
   <form id="f" class="bar">
     <input id="msg" autofocus placeholder="Type a message">
