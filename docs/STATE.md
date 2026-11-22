@@ -9,15 +9,16 @@ pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
 - Goal 8 (MCP servers, Pi-style, @earendil-works/pi-mcp 1.6.0 pinned):
   - 8.1 config loader (src/mcp-config.ts) and 8.2 runner stdio servers (runner/mcp.ts) committed 3204004.
   - 8.3 app side (src/mcp.ts McpManager, wired in src/harness.ts) committed cd475eb. Suite 74 passing.
-  - 8.4 WS messages and browser panel: NEXT. Then 8.5 live check, 8.6 notes.
+  - 8.4 WS messages and browser panel committed afc77b0. Suite 79 passing.
+  - 8.5 live check on dev PASSED (haiku-5-5 called the stdio echo tool). 8.6 out-of-scope list in NOTES.md.
+  - Goal 8 is done apart from the browser click-through (TO TEST LATER) and the push.
 
 ## Current task
-- Goal 8.4: WS messages mcp-list, mcp-add, mcp-remove, mcp-reconnect (in src/server.ts, using root's McpManager from openHarness: `mcp`, `mcpErrors`). Then a browser panel in public/.
+- None open in goal 8. Next: push (blocked, see below) and the browser check of the MCP panel.
 
 ## Next step
-1. Read src/server.ts auth-status handler as the pattern; add the four WS messages with tests in tests/http.test.ts style.
-2. Add a small panel in public/index.html and public/app.js (list, add, remove, reconnect; show state and error).
-3. Verify whether an open chat sees a server added later (NOTES.md 8.3 item).
+1. Push origin main: BLOCKED, the host has no GitHub credentials (git says "could not read Username for https://github.com"). The user has authorised pushes (m00748). Needs a credential helper or token from the user, then `git push origin HEAD`.
+2. Browser check (with goal 7 and goal 6 items below).
 
 ## How to run and test
 - Typecheck: `npm run typecheck`. Tests: `npm test` (node:test; spawns the real server on a random port).
@@ -27,10 +28,12 @@ pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
 - Browser key row and question card were not clicked in a real browser (WS path tested only). Logged as TO TEST LATER.
 - Earlier push to origin/main (goal 6) broke AGENTS.md rule (no remote pushes). Commits since then are NOT pushed. Do not push without the user's OK.
 - Old test chats and files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt) still exist; do not delete without approval.
+- Dev live check created /workspace/mcp-live/echo-server.mjs in the dev workspace volume and an "echo" entry in dev mcp.json. Delete with user OK.
 - Goal 8 first pass leaves out OAuth for remote servers, deferred and codemode exposure, ${VAR} expansion in headers, project-level config (see NOTES.md).
 
 ## Needs you
 - TO TEST LATER (user request m00596): in the real browser, use the Anthropic key row (save, see "entered in browser", remove) and the question card from goal 6.
+- Push needs GitHub credentials on this host (token or ssh key). Pushes since goal 6 are all local.
 - Decide on the earlier push to origin (goal 6) and any future pushes. Plain explanation for the user: a "push" copies your local commits to the copy on GitHub. Nothing has been pushed since goal 6, so nothing new is exposed. Say "yes" or "no" to the earlier push.
 - Delete test chats and workspace files (listed above) if you want them gone.
 - Second account for goal 5.2 if you want that check.

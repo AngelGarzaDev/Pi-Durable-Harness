@@ -131,3 +131,20 @@
 - Tests: tests/mcp-ws.test.ts (5), spawns the real server and an in-process HTTP fixture. Suite 79 passing.
 - Not clicked in a real browser yet: TO TEST LATER with the goal 7 key row and the goal 6 question card.
 - Pushing failed: no GitHub credentials on this host (git: "could not read Username for 'https://github.com'"). The user authorised pushes (m00748) but credentials are needed. Commits are local only.
+
+## 2026-11-22 goal 8.5: live check on dev (stdio MCP, claude-haiku-5-5)
+- Setup: copied tests/fixtures/mcp-echo-server.mjs into the dev workspace volume at /workspace/mcp-live/echo-server.mjs (via `docker run alpine` piping stdin; a bind mount of the repo failed with permission denied under SELinux). Removing it later needs user OK; it is test data only.
+- Ran `node scripts/live-mcp-check.mjs` against dev (127.0.0.1:8787): new chat, settings haiku-5-5 / limit 100000 / maxTurns 10, mcp-add echo (command node, args /workspace/mcp-live/echo-server.mjs) → state ready, 3 tools, exposure direct.
+- Prompt: echo the text live-check-7731. Result: assistant called mcp__echo__echo, tool-result "live-check-7731", final assistant reply "live-check-7731". errors: none.
+- Finding: the chat was opened before the server was added and still used it, so servers added later are visible to existing chats.
+- Cost: 2 haiku calls, small input (well under $0.01 estimated). Model: claude-haiku-5-5 only.
+- Dev now runs the goal 8 build (docker compose up -d --build, healthz ok).
+- Dev mcp.json for the dev data volume now contains the "echo" server; remove it from the UI if unwanted.
+
+## 2026-11-22 goal 8.6: out of scope for the first pass
+- OAuth for remote MCP servers (Pi has OAuth fields; not implemented, so remote servers needing login fail with an error).
+- Deferred and codemode exposure (only direct and hidden are implemented).
+- ${VAR} expansion in headers and env; values are literal.
+- Project-level config (only DATA_DIR/mcp.json).
+- /login-style sign-in for MCP servers.
+- Runner stdio: anyone who can add a server can run its command in the runner (no credentials, workspace volume only).
