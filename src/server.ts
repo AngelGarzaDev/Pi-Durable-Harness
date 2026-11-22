@@ -20,11 +20,12 @@ type ClientMessage =
 	| { type: "new" }
 	| { type: "list" }
 	| { type: "open"; conversationId: number }
-	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number };
+	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
+	| { type: "review"; on: boolean };
 
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
-const { harness, root, models, settings: initialSettings } = await openHarness(config);
+const { harness, root, models, settings: initialSettings, reviews } = await openHarness(config);
 let settings: ChatSettings = initialSettings;
 const titles: Titles = loadTitles(config.dataDir);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
@@ -152,10 +153,10 @@ wss.on("connection", async (socket: WebSocket) => {
 		active = conv;
 		watch = await conv.watch(context);
 		watch.start(async (call) => {
-			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs) });
+			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.isOn(conv.id) });
 			else send({ type: "error", message: "watch failed" });
 		});
-		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs) });
+		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.isOn(conv.id) });
 		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat") });
 	};
 	try {
@@ -222,6 +223,10 @@ wss.on("connection", async (socket: WebSocket) => {
 				saveSettings(config.dataDir, next);
 				settings = next;
 				send(settingsPayload());
+			} else if (msg.type === "review") {
+				// Answer review for this chat only. Takes effect on the next answer.
+				reviews.set(active.id, msg.on === true);
+				send({ type: "review", conversationId: active.id, on: reviews.isOn(active.id) });
 			} else if (msg.type === "compact") {
 				await active.compact(typeof msg.instructions === "string" ? msg.instructions : undefined, context);
 			} else {

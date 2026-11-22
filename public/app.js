@@ -1,4 +1,5 @@
 // Browser client: chat list, transcript, settings, and chat actions (send, steer, fork, reset, compact).
+import { reviewLine, isReviewContinuation } from "./review-view.js";
 const ws = new WebSocket(`ws://${location.host}/ws`);
 const out = document.getElementById("transcript");
 const status = document.getElementById("status");
@@ -13,6 +14,9 @@ function blockText(content) {
 
 // Each entry holds zero or more messages. One display item per message part.
 function items(entry) {
+	const review = reviewLine(entry);
+	if (review) return [{ cls: "review", label: "", text: review }];
+	if (isReviewContinuation(entry)) return [];
 	const msgs = Array.isArray(entry.model) ? entry.model : [];
 	if (msgs.length === 0) return [{ cls: "other", label: entry.kind, text: "" }];
 	const result = [];
@@ -47,7 +51,7 @@ function render(entries) {
 		for (const it of items(e)) {
 			const div = document.createElement("div");
 			div.className = it.cls;
-			div.textContent = it.text ? `${it.label}: ${it.text}` : it.label;
+			div.textContent = it.cls === "review" ? it.text : it.text ? `${it.label}: ${it.text}` : it.label;
 			out.appendChild(div);
 		}
 		if ((e.kind === "pi.user" || e.kind === "pi.assistant") && Array.isArray(e.model) && e.model.length) {
@@ -87,6 +91,10 @@ ws.onmessage = (e) => {
 	if (msg.type === "view") {
 		render(msg.view.entries);
 		showNotice(msg.notice);
+		reviewBox.checked = !!msg.review;
+	} else if (msg.type === "review") {
+		reviewBox.checked = msg.on;
+		settingsMsg.textContent = msg.on ? "Review is on for this chat." : "Review is off for this chat.";
 	}
 	else if (msg.type === "open") {
 		openId = msg.conversationId;
@@ -114,6 +122,8 @@ document.getElementById("f").onsubmit = (e) => {
 document.getElementById("steer").onclick = () => send("steer");
 document.getElementById("new").onclick = () => ws.send(JSON.stringify({ type: "new" }));
 document.getElementById("stop").onclick = () => ws.send(JSON.stringify({ type: "abort" }));
+const reviewBox = document.getElementById("review");
+reviewBox.onchange = () => ws.send(JSON.stringify({ type: "review", on: reviewBox.checked }));
 document.getElementById("compact").onclick = () => ws.send(JSON.stringify({ type: "compact" }));
 document.getElementById("reset").onclick = () => {
 	const note = prompt("Optional note to carry over into the fresh context (leave empty for none):", "");

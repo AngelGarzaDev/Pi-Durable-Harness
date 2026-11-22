@@ -28,6 +28,7 @@ h1 { font-size: 1.3rem; margin: 0; }
 .tool-result { color: var(--result-fg); background: var(--result-bg); }
 .tool-error { color: var(--error-fg); background: var(--error-bg); }
 .other { color: var(--muted); font-size: .8rem; }
+.review { color: var(--muted); font-size: .85rem; border-left: 2px solid var(--muted); padding-left: .5rem; margin: .4rem 0; white-space: pre-wrap; }
 .notice { color: #f0c674; background: #2e2818; border: 1px solid #5b4a1e; border-radius: 4px; padding: .4rem .6rem; margin: .5rem 0; }
 .branch { font-size: .75rem; padding: .1rem .4rem; margin-left: .5rem; vertical-align: middle; }
 form.bar { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
@@ -61,9 +62,12 @@ button:hover { background: #3a4150; }
     <button type="button" id="steer" title="Adds your message to the answer in progress, after the current tool step finishes. The answer does not stop.">Steer</button>
   </form>
   <div id="actions">
+    <label title="A second check on each answer. A reviewer asks this chat's model whether the answer is correct; a FAIL sends it back once. Only this chat.">
+      <input type="checkbox" id="review"> Review answers
+    </label>
     <button type="button" id="stop">Abort</button>
     <button type="button" id="compact" title="Summarize older messages to free up room">Compact</button>
     <button type="button" id="reset" title="Start a fresh context. Old messages stay visible but Claude stops seeing them.">New context</button>
   </div>
 </div>
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>

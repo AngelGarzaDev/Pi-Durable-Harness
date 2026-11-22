@@ -12,8 +12,8 @@
 - [x] 2.2 UI tooltip and docs/NOTES.md: steer joins after the current tool step.
 
 ## Goal 3: review tasks (design in root PLAN.md "Plan: review tasks")
-- [ ] 3.1 Per-chat review setting (off by default), stored in settings.json per chat or globally (decide, record in NOTES).
-- [ ] 3.2 Reviewer task via onYield hook, same model default, one retry max. Mock tests.
-- [ ] 3.3 Transcript entry for review result; live check with haiku at 100000 tokens.
+- [x] 3.1 Per-chat review setting (off by default), stored in reviews.json in the data volume (NOTES).
+- [x] 3.2 Reviewer task via onYield hook, same model default, one retry max. Hook tests in tests/review.test.ts.
+- [x] 3.3 Transcript entry for review result; live check with haiku at 100000 tokens (NOTES: PASS, FAIL+retry, one miss).
 
 Done rule: tests, `npm run typecheck && npm test`, docs, commit.

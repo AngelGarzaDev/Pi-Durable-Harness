@@ -11,6 +11,7 @@ import type { Config } from "./config.js";
 import { INSTRUCTIONS } from "./prompt.js";
 import { checkSettings, compactionFor, defaultSettings, loadSettings, type ChatSettings, type ModelInfo } from "./settings.js";
 import { readApiKey } from "./config.js";
+import { ReviewSettings, reviewExtension } from "./review.js";
 
 export const context = BACKGROUND_CONTEXT;
 
@@ -37,6 +38,9 @@ export async function openHarness(config: Config) {
 	const storage = await openNodeSqliteStorage(join(config.dataDir, "session.sqlite"));
 	const registry = createRegistry();
 	registry.install(createCodingTools());
+	// Answer review: installed for all chats, but it only acts in chats that have it switched on (reviews.json).
+	const reviews = new ReviewSettings(config.dataDir);
+	registry.install(reviewExtension(reviews));
 	const harness = await Harness.open(storage, {
 		models,
 		registry,
@@ -53,7 +57,7 @@ export async function openHarness(config: Config) {
 	});
 	await applySettings(root, models, settings);
 	harness.resume(); // continue any run the last process left unfinished
-	return { harness, root, models, settings };
+	return { harness, root, models, settings, reviews };
 }
 
 // Chat models the browser can pick, from the pi-ai catalog.
