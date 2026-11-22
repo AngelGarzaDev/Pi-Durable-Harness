@@ -11,7 +11,7 @@ pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
   - 8.3 app side (src/mcp.ts McpManager, wired in src/harness.ts) committed cd475eb. Suite 74 passing.
   - 8.4 WS messages and browser panel committed afc77b0. Suite 79 passing.
   - 8.5 live check on dev PASSED (haiku-5-5 called the stdio echo tool). 8.6 out-of-scope list in NOTES.md.
-  - Goal 8 + edit-server option (mcp-update) committed; dev rebuilt. Production NOT yet redeployed for mcp-update.
+  - Goal 8 + edit-server option (mcp-update) committed; dev rebuilt. Production deployed a329be2 (includes mcp-update).
 - Goal 8 done and pushed (origin/main d54cb01) and deployed to production d54cb01.
 
 ## Current task

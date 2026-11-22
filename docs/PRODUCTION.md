@@ -69,3 +69,4 @@ Never `down -v`.
 ## Browser-entered key and MCP servers (live since d54cb01)
 - Anthropic key: a key saved in the browser is stored in the app-data volume at credentials.json (mode 600, plaintext). It wins over the Docker secret. Decision and reasoning in docs/NOTES.md (goal 7).
 - MCP servers: DATA_DIR/mcp.json in the app-data volume. Local programs run inside the runner (no credentials).
+- 2026-11-22: production updated d54cb01 → a329be2 (edit an MCP server). Backup first: deploy/production/backup/app-data-pre-edit-2026-11-22-1738.tgz (ignored by git). Checks: healthz ok, WS auth-status and mcp-list answer.

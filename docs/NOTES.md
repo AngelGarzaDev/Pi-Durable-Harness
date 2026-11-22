@@ -174,3 +174,6 @@
 - UI: Edit button per row fills the form; Save changes sends mcp-update, Cancel edit clears. Editing keeps headers/env and other fields; only url/command/args come from the form.
 - Test: tests/mcp-ws.test.ts "mcp-update replaces..." (suite 80 passing).
 - Not yet clicked in a real browser.
+
+## 2026-11-22 production deploy a329be2 (user m00940)
+- Backup taken with the streaming method (bind mount not used). deploy.sh → healthy at 8790, .deployed-commit a329be2. Read-only WS checks only, no model call.
