@@ -1,0 +1,63 @@
+# PRODUCTION: pi-durable-web for personal use
+
+**This is the live app that the user uses every day. Do not modify, restart, or wipe it without the user's explicit request.**
+The development stack (repo root `compose.yaml`, port 8787) is separate and may be rebuilt freely.
+
+## What is what
+| | Production | Development |
+|---|---|---|
+| Compose file | `deploy/production/compose.yaml` | `compose.yaml` (repo root) |
+| Compose project | `pi-durable-prod` | `pi-durable-web` |
+| URL | http://127.0.0.1:8790 | http://127.0.0.1:8787 |
+| Containers | `pi-durable-prod-app-1`, `pi-durable-prod-runner-1` | `pi-durable-web-app-1`, `pi-durable-web-runner-1` |
+| Chat data (volume) | `pi-durable-prod_app-data` | `pi-durable-web_app-data` (old test chats) |
+| Workspace (volume) | `pi-durable-prod_workspace` | `pi-durable-web_workspace` (old test files) |
+| Secrets | `deploy/production/secrets/` | `secrets/` |
+| Model | `claude-haiku-5-5` (set in compose) | any, for tests |
+
+Production has its own secrets: the Anthropic key was copied from dev; the app token and runner token were generated new.
+
+## Rules for the agent
+1. Never run `docker compose down -v`, `docker volume rm`, or `docker system prune --volumes` on either stack.
+2. Never edit files under `deploy/production/secrets/` or `deploy/production/.env`, and never print them.
+3. Deploy production only with `deploy/production/deploy.sh`. It refuses a dirty tree, so the commit is what runs. Do not run `docker compose up` by hand in production unless the script cannot be used.
+4. Do not point live tests at production. Live tests use the dev stack (8787) with `claude-haiku-5-5` and a 100000 token limit.
+5. Do not touch the `llama_cpp` container.
+6. Do not delete chat or workspace data without the user's approval.
+
+## Deploy a new version
+```
+git status                       # must be clean; commit first
+deploy/production/deploy.sh      # builds, starts, waits for /healthz on 8790, writes deploy/production/.deployed-commit
+```
+`deploy/production/.deployed-commit` records the commit that is running. Check with:
+```
+curl -s http://127.0.0.1:8790/healthz      # prints ok
+cat deploy/production/.deployed-commit
+cd deploy/production && docker compose ps
+```
+
+## First-time setup (already done, for reference)
+- `deploy/production/secrets/{anthropic_api_key,app_token,runner_token}`, mode 600.
+- `deploy/production/.env` with `HOST_UID` and `HOST_GID` (the containers run as this uid).
+- SELinux (Enforcing on this host): secrets must carry `container_file_t`. `deploy.sh` does this. Without it the runner fails with `EACCES: permission denied, open '/run/secrets/runner_token'`.
+
+## Backup
+Chat data is in `pi-durable-prod_app-data` (SQLite). Back up before any risky change:
+```
+docker run --rm -v pi-durable-prod_app-data:/data:ro -v "$PWD/deploy/production/backup:/backup" alpine \
+  tar czf /backup/app-data-$(date +%F).tgz -C /data .
+```
+Keep backups out of git (`deploy/production/backup/` is ignored).
+
+## Logs and stop
+```
+cd deploy/production
+docker compose logs --tail 100 app runner
+docker compose stop        # pause only; data kept
+docker compose up -d       # start again
+```
+Never `down -v`.
+
+## Change log
+- 2026-11-22: production created on port 8790, from commit 2d95ba3 (ask_user feature included). Login verified (correct token 200, wrong 401). Model claude-haiku-5-5.

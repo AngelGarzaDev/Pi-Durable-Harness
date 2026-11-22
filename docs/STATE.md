@@ -1,5 +1,7 @@
 # STATE (handoff)
 
+!! PRODUCTION is running at http://127.0.0.1:8790 (personal use). Read docs/PRODUCTION.md before touching any docker or deploy command. Do not change production without the user's request.
+
 ## Summary
 pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
 - Goals 1-5 done (turn-limit notice, steer timing, answer review, production hardening, README audit). 5.2 blocked (needs second account).

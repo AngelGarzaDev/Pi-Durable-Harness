@@ -12,6 +12,10 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 [ -s deploy/production/secrets/app_token ] || { echo "Missing deploy/production/secrets. See docs/PRODUCTION.md." >&2; exit 1; }
 cd deploy/production
+# SELinux (Enforcing here): secret files need the container label, or the containers get EACCES on /run/secrets.
+if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" = "Enforcing" ]; then
+  chcon -t container_file_t secrets/* || echo "warning: could not relabel production secrets" >&2
+fi
 docker compose up -d --build
 commit="$(git -C ../.. rev-parse --short HEAD)"
 echo "$commit" > .deployed-commit

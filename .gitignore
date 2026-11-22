@@ -7,3 +7,4 @@ secrets/
 deploy/production/secrets/
 deploy/production/.env
 .deployed-commit
+deploy/production/backup/
