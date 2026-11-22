@@ -141,7 +141,10 @@ function renderChats(chats) {
 	}
 }
 
-ws.onopen = () => (status.textContent = "connected");
+ws.onopen = () => {
+	status.textContent = "connected";
+	ws.send(JSON.stringify({ type: "auth-status" }));
+};
 ws.onclose = () => (status.textContent = "disconnected, reload to reconnect");
 ws.onmessage = (e) => {
 	const msg = JSON.parse(e.data);
@@ -169,7 +172,9 @@ ws.onmessage = (e) => {
 	else if (msg.type === "error") {
 		status.textContent = "error: " + msg.message;
 		settingsMsg.textContent = msg.message;
+		keyMsg.textContent = msg.message;
 	} else if (msg.type === "settings") showSettings(msg);
+	else if (msg.type === "auth") showKey(msg.anthropic);
 };
 
 const input = document.getElementById("msg");
@@ -240,4 +245,28 @@ document.getElementById("settings").onsubmit = (e) => {
 	e.preventDefault();
 	settingsMsg.textContent = "Applying…";
 	ws.send(JSON.stringify({ type: "settings", modelId: modelSelect.value, contextLimit: Number(limitInput.value), maxTurns: Number(maxTurnsInput.value) }));
+};
+
+// Anthropic key from the browser. The server never sends the key back, only where it comes from and its last four characters.
+const keySource = document.getElementById("keysource");
+const keyInput = document.getElementById("keyinput");
+const keyMsg = document.getElementById("keymsg");
+const keyClear = document.getElementById("keyclear");
+function showKey(info) {
+	const label = { browser: `entered in browser (${info.hint ?? ""})`, secret: "Docker secret", none: "none set" }[info.source] ?? info.source;
+	keySource.textContent = label;
+	keyClear.disabled = info.source !== "browser";
+	keyMsg.textContent = "";
+}
+document.getElementById("keyform").onsubmit = (e) => {
+	e.preventDefault();
+	const key = keyInput.value.trim();
+	if (!key) return (keyMsg.textContent = "Enter a key first.");
+	keyMsg.textContent = "Saving…";
+	ws.send(JSON.stringify({ type: "auth-set", key }));
+	keyInput.value = "";
+};
+keyClear.onclick = () => {
+	if (!confirm("Remove the key entered in the browser? The Docker secret is used again if there is one.")) return;
+	ws.send(JSON.stringify({ type: "auth-clear" }));
 };

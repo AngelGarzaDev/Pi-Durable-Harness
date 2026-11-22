@@ -91,3 +91,12 @@
 - Live check, claude-haiku-5-5, context limit 100000 (default). Script /tmp/livecheck/run.mjs (outside repo, not committed): logs in with the app token read from file (not printed), opens WS, sends new + submit asking for a two-option colour question, clicks "Red", waits for final reply. Result: question seen with options ["Red","Blue"]; answer-result ok; model replied "You chose Red.". Cost: 3 runs of about 3 calls each, well under $0.05.
 - One early run waited for a reply that did not match the detection rule (the detection was too loose), so it was re-run with a fixed rule; the re-run passed. Browser UI itself was not clicked (no browser login without putting the token in a tool call); the card HTML/JS was checked with node --check and the WS path was tested live.
 - `docker compose up -d --build` ok; app healthy; `curl -s http://127.0.0.1:8787/healthz` returns ok.
+
+## 2026-11-22 goal 7: browser-entered Anthropic key
+- Decision (user m00454: allow browser-entered key; reuse Pi's architecture). Storage: DATA_DIR/credentials.json, mode 600, in the app-data volume, plaintext. Alternative (encrypted with a key kept elsewhere) rejected for now: the key that decrypts would sit next to the ciphertext in the same volume, so it adds little. Revisit if the data volume is ever shared or backed up off-host.
+- Mechanism: pi-ai's Models reads a CredentialStore on every request, so a new key takes effect with no restart. Stored key beats the Docker secret (pi-ai anthropic provider resolve order: stored credential, ANTHROPIC_AUTH_TOKEN, env keys, federation).
+- The Docker secret is now optional when a browser key exists (readOptionalApiKey). With neither, startup still fails with the original readApiKey error.
+- Surprise: pi-ai's `@earendil-works/pi-ai/auth` subpath does not exist; types come from the package root.
+- Key never leaves the server: auth-status / auth-set replies carry only source and last four characters. Format check only (sk-ant- prefix, length 20–300, no spaces); no live call.
+- Tests: tests/credentials.test.ts (5), tests/http.test.ts auth WS test. Suite 62 passing, typecheck clean.
+- UI: key row under the settings bar (password field, Save key, Remove browser key). Checked with node --check and curl; not clicked in a real browser (no token in tool calls).

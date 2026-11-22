@@ -43,9 +43,9 @@ User request: the harness presents a question; the user clicks an answer or type
 ## Goal 7: browser-entered Anthropic key (started 2026-11-22)
 User decision (m00454): allow a key entered in the browser. Reuse pi-ai's CredentialStore and api_key login flow, as Pi does.
 Storage: DATA_DIR/credentials.json, mode 600, owner the app user, inside the app-data volume. Stored key wins over the Docker secret; logout falls back to the secret.
-- [ ] 7.1 File-backed CredentialStore (src/credentials.ts) passed to createModels; pi-ai api_key login run with a browser prompt. Tests: store round trip, file mode 600, stored key used by resolve, logout falls back.
-- [ ] 7.2 WS messages `auth-status` (never returns the key, only "stored"/"secret"/"none" and last 4 chars), `auth-set` (validates sk-ant- prefix, sends a 1-token check call? NO: no live call; validate format only), `auth-clear`. Tests in tests/http.test.ts.
-- [ ] 7.3 Browser: settings panel shows key source, password field to enter/replace key, clear button.
+- [x] 7.1 File-backed CredentialStore (src/credentials.ts) passed to createModels; pi-ai api_key login run with a browser prompt. Tests: store round trip, file mode 600, stored key used by resolve, logout falls back.
+- [x] 7.2 WS messages `auth-status` (never returns the key, only "stored"/"secret"/"none" and last 4 chars), `auth-set` (validates sk-ant- prefix and length only; no live call, so setting a key costs nothing), `auth-clear`. Tests in tests/http.test.ts.
+- [x] 7.3 Browser: settings panel shows key source, password field to enter/replace key, clear button.
 - [ ] 7.4 Docs: docs/NOTES.md decision (plaintext in volume vs encrypted), docs/PRODUCTION.md note; verify in dev.
 
 ## Goal 8: MCP servers (started 2026-11-22)

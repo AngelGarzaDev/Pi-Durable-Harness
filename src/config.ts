@@ -32,6 +32,16 @@ export function readRunnerToken(path: string): string {
 	return token;
 }
 
+// Like readApiKey, but returns undefined when the file is missing or empty (a browser-entered key may replace it).
+export function readOptionalApiKey(path: string): string | undefined {
+	try {
+		const key = readFileSync(path, "utf8").trim();
+		return key.startsWith("sk-ant-") ? key : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 // Reads the key once at startup. Returns the trimmed value and never logs it.
 export function readApiKey(path: string): string {
 	const key = readFileSync(path, "utf8").trim();

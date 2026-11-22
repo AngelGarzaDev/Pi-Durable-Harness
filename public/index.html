@@ -19,6 +19,9 @@ h1 { font-size: 1.3rem; margin: 0; }
 #settings select, #settings input { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .3rem; }
 #settings input { width: 9rem; }
 #settings-msg { color: var(--muted); }
+.keyrow { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: 0 0 .75rem; color: var(--muted); font-size: .85rem; }
+.keyrow input { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .3rem; width: 16rem; }
+#keymsg { color: var(--muted); }
 #transcript { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-y: auto; white-space: pre-wrap; background: var(--panel); min-height: 12rem; }
 .user, .assistant { margin: .5rem 0; }
 .user { color: var(--user); }
@@ -61,6 +64,13 @@ button:hover { background: #3a4150; }
     <label>Compact at <input id="limit" type="number" step="1000"> tokens</label>
     <label>Max tool rounds <input id="maxturns" type="number" min="1" step="1" style="width:6rem"></label>
     <button type="submit">Apply</button> <span id="settings-msg"></span>
+  </form>
+  <form id="keyform" class="keyrow">
+    <span>Anthropic key: <span id="keysource">checking…</span></span>
+    <input id="keyinput" type="password" autocomplete="off" placeholder="sk-ant-… (stored in this app's data, never shown again)">
+    <button type="submit">Save key</button>
+    <button type="button" id="keyclear" title="Remove the key entered here. The Docker secret, if any, is used again.">Remove browser key</button>
+    <span id="keymsg"></span>
   </form>
   <div id="notice" class="notice" hidden></div>
   <div id="questions"></div>

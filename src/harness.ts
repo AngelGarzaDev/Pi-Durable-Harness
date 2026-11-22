@@ -10,9 +10,10 @@ import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite
 import type { Config } from "./config.js";
 import { INSTRUCTIONS } from "./prompt.js";
 import { checkSettings, compactionFor, defaultSettings, loadSettings, type ChatSettings, type ModelInfo } from "./settings.js";
-import { readApiKey, readRunnerToken } from "./config.js";
+import { readApiKey, readOptionalApiKey, readRunnerToken } from "./config.js";
 import { ReviewSettings, reviewExtension } from "./review.js";
 import { askExtension } from "./ask.js";
+import { FileCredentialStore } from "./credentials.js";
 
 export const context = BACKGROUND_CONTEXT;
 
@@ -31,11 +32,15 @@ function withoutMessageThreads<T extends Provider<"anthropic-messages">>(base: T
 // Opens the Harness over a SQLite file in the data dir. The four coding tools run in the runner container, never here.
 export async function openHarness(config: Config) {
 	mkdirSync(config.dataDir, { recursive: true });
-	const apiKey = readApiKey(config.apiKeyFile);
 	const runnerToken = readRunnerToken(config.runnerTokenFile);
+	// A key entered in the browser (stored in the data dir) wins over the Docker secret, so the secret is optional
+	// once a browser key exists. Neither key is ever logged.
+	const credentials = new FileCredentialStore(join(config.dataDir, "credentials.json"));
+	const secretKey = readOptionalApiKey(config.apiKeyFile);
 	// pi-ai's Anthropic provider reads ANTHROPIC_API_KEY from the environment; it stays in this process only.
-	process.env.ANTHROPIC_API_KEY = apiKey;
-	const models = createModels();
+	if (secretKey) process.env.ANTHROPIC_API_KEY = secretKey;
+	else if (!(await credentials.read("anthropic"))) readApiKey(config.apiKeyFile); // throws with a clear message
+	const models = createModels({ credentials });
 	models.setProvider(withoutMessageThreads(anthropicProvider()));
 	const storage = await openNodeSqliteStorage(join(config.dataDir, "session.sqlite"));
 	const registry = createRegistry();
@@ -61,7 +66,7 @@ export async function openHarness(config: Config) {
 	});
 	await applySettings(root, models, settings);
 	harness.resume(); // continue any run the last process left unfinished
-	return { harness, root, models, settings, reviews };
+	return { harness, root, models, settings, reviews, credentials, secretKey: secretKey !== undefined };
 }
 
 // Chat models the browser can pick, from the pi-ai catalog.

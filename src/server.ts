@@ -6,6 +6,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import { loadConfig } from "./config.js";
+import { anthropicStatus, checkKeyFormat, clearAnthropicKey, setAnthropicKey } from "./credentials.js";
 import { SESSION_COOKIE, isAuthed, readAccessToken, sessionValue, tokenMatches } from "./auth.js";
 import { applySettings, context, listModels, modelInfo, openHarness } from "./harness.js";
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
@@ -25,11 +26,15 @@ type ClientMessage =
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
 	| { type: "review"; on?: boolean; reviewerModel?: string }
 	// An answer to a question the model asked (ask_user). taskId and key must match a question shown in the open chat.
-	| { type: "answer"; taskId: number; key: string; text: string };
+	| { type: "answer"; taskId: number; key: string; text: string }
+	// Anthropic key from the browser. The key is only ever sent TO the server; no message returns it.
+	| { type: "auth-status" }
+	| { type: "auth-set"; key: string }
+	| { type: "auth-clear" };
 
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
-const { harness, root, models, settings: initialSettings, reviews } = await openHarness(config);
+const { harness, root, models, settings: initialSettings, reviews, credentials, secretKey } = await openHarness(config);
 let settings: ChatSettings = initialSettings;
 const titles: Titles = loadTitles(config.dataDir);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
@@ -274,6 +279,17 @@ wss.on("connection", async (socket: WebSocket) => {
 				else send({ type: "answer-result", ok: false, taskId: msg.taskId, key: msg.key, error: "The question was already answered or has closed." });
 			} else if (msg.type === "compact") {
 				await active.compact(typeof msg.instructions === "string" ? msg.instructions : undefined, context);
+			} else if (msg.type === "auth-status") {
+				send({ type: "auth", anthropic: await anthropicStatus(credentials, secretKey) });
+			} else if (msg.type === "auth-set") {
+				const key = typeof msg.key === "string" ? msg.key.trim() : "";
+				const problem = checkKeyFormat(key);
+				if (problem) return send({ type: "error", message: problem });
+				await setAnthropicKey(models, key);
+				send({ type: "auth", anthropic: await anthropicStatus(credentials, secretKey) });
+			} else if (msg.type === "auth-clear") {
+				await clearAnthropicKey(models);
+				send({ type: "auth", anthropic: await anthropicStatus(credentials, secretKey) });
 			} else {
 				send({ type: "error", message: "unknown message" });
 			}

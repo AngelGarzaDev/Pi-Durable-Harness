@@ -136,6 +136,42 @@ test("WebSocket: an answer to a question that is not open is refused, not delive
 	ws.close();
 });
 
+test("WebSocket: auth-set stores a browser key (format-checked), auth-status never returns it, auth-clear falls back", async () => {
+	const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { headers: { cookie, origin: `http://127.0.0.1:${PORT}` } });
+	await new Promise<void>((resolve, reject) => { ws.on("open", () => resolve()); ws.on("error", reject); });
+	const messages: Record<string, unknown>[] = [];
+	ws.on("message", (d) => messages.push(JSON.parse(String(d))));
+	const next = (type: string) => new Promise<Record<string, unknown>>((resolve, reject) => {
+		const end = Date.now() + 5000;
+		const tick = () => {
+			const i = messages.findIndex((m) => m.type === type);
+			if (i >= 0) return resolve(messages.splice(i, 1)[0]);
+			if (Date.now() > end) return reject(new Error("no " + type));
+			setTimeout(tick, 20);
+		};
+		tick();
+	});
+	const BROWSER_KEY = "sk-ant-test-browser-entered-9876";
+
+	ws.send(JSON.stringify({ type: "auth-status" }));
+	let reply = await next("auth");
+	assert.deepEqual(reply.anthropic, { source: "secret" });
+
+	ws.send(JSON.stringify({ type: "auth-set", key: "not-a-key" }));
+	const bad = await next("error");
+	assert.match(String(bad.message), /sk-ant-/);
+
+	ws.send(JSON.stringify({ type: "auth-set", key: BROWSER_KEY }));
+	reply = await next("auth");
+	assert.deepEqual(reply.anthropic, { source: "browser", hint: "…9876" });
+	assert.ok(!JSON.stringify(reply).includes(BROWSER_KEY), "the key must not be echoed back");
+
+	ws.send(JSON.stringify({ type: "auth-clear" }));
+	reply = await next("auth");
+	assert.deepEqual(reply.anthropic, { source: "secret" });
+	ws.close();
+});
+
 test("wrong tokens are refused, then the address is locked out with 429 and Retry-After", async () => {
 	// Every attempt counts, including the 413 above, so only four wrong tokens get a 401 before the lockout.
 	const statuses: number[] = [];
