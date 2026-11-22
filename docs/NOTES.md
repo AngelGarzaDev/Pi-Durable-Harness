@@ -44,3 +44,8 @@
 - Runner 500 responses no longer carry the raw error text; it is logged on the server (F11).
 - Tests: tests/runner-guard.test.ts (unit) and tests/runner-http.test.ts (starts runner/server.ts as child; auth, 413, symlink escape, non-string path, prototype method names).
 - Surprise: fetch (undici) reuses a keep-alive socket that the server destroyed after an oversized upload, which showed as ECONNRESET on the next test. Fixed by sending 413 with connection: close before destroying the request.
+
+## 2026-11-22 Goal 4.3: process robustness
+- Chat list and "apply to all chats" follow scanConversations cursors (collectPages in src/chats.ts); before, both stopped at 200 chats (review F10). Tested with tests/collect-pages.test.ts.
+- unhandledRejection is logged instead of ignored; watch stop errors are logged (F7). Shutdown terminates WebSocket clients, closes the HTTP server, closes the harness, and forces exit after 10 s (F18).
+- Accepted and recorded: sessions do not expire and logout does not revoke the cookie (F5). The cookie is HMAC-like (sha256 of "session:"+token), so changing secrets/app_token is the only revoke. Documented in SECURITY.md.
