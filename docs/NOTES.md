@@ -185,3 +185,7 @@
 - Verified in a real browser on a static harness (python http.server on 127.0.0.1:8999, copy of public/ files): headings, bold/italic, inline code, list, table, fenced code + Copy, quote, link. Injected onerror and javascript: href were removed; no script ran; no img after the forbid change.
 - Not verified on the live app page (no login in tool calls). User messages stay plain text (no markdown), by design.
 - Test-harness gotcha: a "</script>" inside a JS string in an inline <script> ends the tag early; escape as <\/script>.
+
+## 2026-11-22 UI restyle (user m00946, "modern intuitive design language")
+- Only CSS changed in public/index.html (same DOM and IDs, app.js untouched). Dark slate tokens, accent #7aa2f7, centred 46rem transcript, right-aligned user bubbles, primary Send, sidebar with active marker, mobile layout under 760px.
+- Checked in a static harness (copy of the page styles with sample transcript, python http.server on 127.0.0.1:8999, not the live app: the live page needs the token, which is not put in tool calls). Live browser check still to do.
