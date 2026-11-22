@@ -152,3 +152,7 @@
 ## 2026-11-22 push to origin (user m00833)
 - Pushing now works. The user authorised it and pointed to the key in secrets/github_repo_api_key (mode 600, gitignored). Push used a temporary GIT_ASKPASS script in /tmp that printed the key from that file and was deleted afterwards. The remote URL stays credential-free and the key is not in git or the transcript.
 - Command: GIT_ASKPASS=<script> GIT_TERMINAL_PROMPT=0 git push origin HEAD → main 5f550bc..5b9938c.
+
+## 2026-11-22 production deploy d54cb01 (user m00862)
+- Backup first (deploy/production/backup/app-data-pre-goal8-2026-11-22-1725.tgz). Then deploy/production/deploy.sh → healthy at 8790, .deployed-commit = d54cb01.
+- Post-deploy read-only WS check via a temp script (removed): auth-status → source "secret", mcp-list → 0 servers. No live model call on production.

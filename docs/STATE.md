@@ -1,6 +1,6 @@
 # STATE (handoff)
 
-!! PRODUCTION is running at http://127.0.0.1:8790 (commit fb098e2). Read docs/PRODUCTION.md before touching docker or deploy. Do not change production without the user's request.
+!! PRODUCTION is running at http://127.0.0.1:8790 (commit d54cb01, deployed 2026-11-22). Read docs/PRODUCTION.md before touching docker or deploy. Do not change production without the user's request.
 
 ## Summary
 pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
@@ -11,7 +11,7 @@ pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
   - 8.3 app side (src/mcp.ts McpManager, wired in src/harness.ts) committed cd475eb. Suite 74 passing.
   - 8.4 WS messages and browser panel committed afc77b0. Suite 79 passing.
   - 8.5 live check on dev PASSED (haiku-5-5 called the stdio echo tool). 8.6 out-of-scope list in NOTES.md.
-  - Goal 8 is done apart from the browser click-through (TO TEST LATER) and the push.
+  - Goal 8 done and pushed (origin/main d54cb01) and deployed to production d54cb01.
 
 ## Current task
 - None open in goal 8. Next: push (blocked, see below) and the browser check of the MCP panel.

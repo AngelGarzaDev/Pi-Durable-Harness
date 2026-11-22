@@ -43,6 +43,9 @@ cd deploy/production && docker compose ps
 - SELinux (Enforcing on this host): secrets must carry `container_file_t`. `deploy.sh` does this. Without it the runner fails with `EACCES: permission denied, open '/run/secrets/runner_token'`.
 
 ## Backup
+Pre-deploy backup for d54cb01: deploy/production/backup/app-data-pre-goal8-2026-11-22-1725.tgz (ignored by git).
+Note: `-v "$PWD/...:/backup"` bind mounts fail with Permission denied here (SELinux). Stream to a host file instead:
+`docker run --rm -v pi-durable-prod_app-data:/data:ro alpine tar czf - -C /data . > backup/app-data-DATE.tgz`
 Chat data is in `pi-durable-prod_app-data` (SQLite). Back up before any risky change:
 ```
 docker run --rm -v pi-durable-prod_app-data:/data:ro -v "$PWD/deploy/production/backup:/backup" alpine \
@@ -61,7 +64,8 @@ Never `down -v`.
 
 ## Change log
 - 2026-11-22: production created on port 8790, from commit 2d95ba3 (ask_user feature included). Login verified (correct token 200, wrong 401). Model claude-haiku-5-5.
+- 2026-11-22: production updated fb098e2 → d54cb01 (goal 7 browser key, goal 8 MCP servers, docs). Backup taken first. Checks: healthz ok, all containers up, auth-status source "secret", mcp-list 0 servers, chats kept.
 
-## Browser-entered key and MCP servers (not yet on production)
+## Browser-entered key and MCP servers (live since d54cb01)
 - Anthropic key: a key saved in the browser is stored in the app-data volume at credentials.json (mode 600, plaintext). It wins over the Docker secret. Decision and reasoning in docs/NOTES.md (goal 7).
-- MCP servers: DATA_DIR/mcp.json in the app-data volume. Local programs run inside the runner (no credentials). Production is still on fb098e2 and does not have these changes until the user asks for a deploy.
+- MCP servers: DATA_DIR/mcp.json in the app-data volume. Local programs run inside the runner (no credentials).
