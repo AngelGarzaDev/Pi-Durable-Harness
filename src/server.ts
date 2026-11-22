@@ -21,7 +21,7 @@ type ClientMessage =
 	| { type: "list" }
 	| { type: "open"; conversationId: number }
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
-	| { type: "review"; on: boolean };
+	| { type: "review"; on?: boolean; reviewerModel?: string };
 
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
@@ -153,10 +153,10 @@ wss.on("connection", async (socket: WebSocket) => {
 		active = conv;
 		watch = await conv.watch(context);
 		watch.start(async (call) => {
-			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.isOn(conv.id) });
+			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id) });
 			else send({ type: "error", message: "watch failed" });
 		});
-		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.isOn(conv.id) });
+		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id) });
 		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat") });
 	};
 	try {
@@ -225,8 +225,14 @@ wss.on("connection", async (socket: WebSocket) => {
 				send(settingsPayload());
 			} else if (msg.type === "review") {
 				// Answer review for this chat only. Takes effect on the next answer.
-				reviews.set(active.id, msg.on === true);
-				send({ type: "review", conversationId: active.id, on: reviews.isOn(active.id) });
+				const patch: { on?: boolean; reviewerModel?: string | null } = {};
+				if (msg.on !== undefined) patch.on = msg.on === true;
+				if (msg.reviewerModel !== undefined) {
+					const id = String(msg.reviewerModel);
+					if (id !== "" && !modelInfo(models, id)) return send({ type: "error", message: "Unknown reviewer model." });
+					patch.reviewerModel = id === "" ? null : id;
+				}
+				send({ type: "review", conversationId: active.id, ...reviews.update(active.id, patch) });
 			} else if (msg.type === "compact") {
 				await active.compact(typeof msg.instructions === "string" ? msg.instructions : undefined, context);
 			} else {

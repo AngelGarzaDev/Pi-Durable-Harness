@@ -1,5 +1,6 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readSettingsFile, writeSettingsFile } from "./settings.js";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import { defineExtension, defineTask, GenerationTask, hook, hookTask, type EntryRecord, type YieldDecision } from "@earendil-works/pi-durable";
@@ -17,8 +18,8 @@ export function buildReviewPrompt(request: string, answer: string): string {
 	return [
 		"You are checking an AI assistant's answer before the user sees it.",
 		"Check it against the user's request for factual errors, arithmetic mistakes, missed parts of the request, and claims of actions that did not happen.",
-		"Reply with exactly one line starting with PASS if the answer is correct and complete.",
-		"Otherwise reply starting with FAIL, then a short list of the specific problems.",
+		"Reply with PASS as the first word if the answer is correct and complete, or FAIL as the first word followed by a short list of the specific problems.",
+		"Put the verdict first, before any working.",
 		"",
 		"User request:",
 		request,
@@ -30,10 +31,14 @@ export function buildReviewPrompt(request: string, answer: string): string {
 
 export type Verdict = { pass: true } | { pass: false; notes: string };
 
-// Anything that is not a clear PASS counts as a fail, so a garbled reply cannot silently approve an answer.
+// The verdict is PASS when the first line starts with PASS. Some replies work through the sum first and put PASS on the
+// last line; that also counts, unless a line starts with FAIL. Anything else is a fail, so a garbled reply cannot approve an answer.
 export function parseVerdict(reply: string): Verdict {
 	const text = reply.trim();
-	if (/^PASS\b/i.test(text)) return { pass: true };
+	const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+	if (/^PASS\b/i.test(lines[0] ?? "")) return { pass: true };
+	const failLine = lines.find((l) => /^FAIL\b/i.test(l));
+	if (!failLine && /^PASS\b/i.test(lines.at(-1) ?? "") && lines.at(-1)!.length <= 40) return { pass: true };
 	const notes = text.replace(/^FAIL\b[:\s-]*/i, "").trim();
 	return { pass: false, notes: notes || "The reviewer did not accept the answer." };
 }
@@ -46,27 +51,50 @@ export function answerText(message: AssistantMessage): string {
 	return message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n").trim();
 }
 
-// Set of chats that have review turned on. Kept in memory and written to reviews.json in the data volume.
+// Per-chat review settings, stored under the "reviews" key of settings.json (see settings.ts).
+// reviewerModel is optional: when unset, the reviewer uses the chat's own model.
+export type ChatReview = { on: boolean; reviewerModel?: string };
+type ReviewsFile = Record<string, ChatReview>;
+
 export class ReviewSettings {
-	private readonly enabled = new Set<number>();
 	constructor(private readonly dataDir: string) {
+		this.migrateFromReviewsFile();
+	}
+	// Earlier builds kept the on-chats in reviews.json (a list of chat ids). Copy them into settings.json once.
+	// reviews.json is left in place; it is no longer read after the copy.
+	private migrateFromReviewsFile(): void {
+		if (readSettingsFile(this.dataDir).reviews !== undefined) return;
 		try {
-			const raw = JSON.parse(readFileSync(join(dataDir, "reviews.json"), "utf8")) as unknown;
-			if (Array.isArray(raw)) for (const id of raw) if (typeof id === "number") this.enabled.add(id);
+			const ids = JSON.parse(readFileSync(join(this.dataDir, "reviews.json"), "utf8")) as unknown;
+			if (!Array.isArray(ids)) return;
+			const reviews: ReviewsFile = {};
+			for (const id of ids) if (typeof id === "number") reviews[String(id)] = { on: true };
+			writeSettingsFile(this.dataDir, { ...readSettingsFile(this.dataDir), reviews });
 		} catch {
-			// No reviews saved yet.
+			// No old file: nothing to copy.
 		}
 	}
-	isOn(conversationId: number): boolean {
-		return this.enabled.has(conversationId);
+	private all(): ReviewsFile {
+		const raw = readSettingsFile(this.dataDir).reviews;
+		return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as ReviewsFile) : {};
 	}
-	set(conversationId: number, on: boolean): void {
-		if (on) this.enabled.add(conversationId);
-		else this.enabled.delete(conversationId);
-		mkdirSync(this.dataDir, { recursive: true });
-		const path = join(this.dataDir, "reviews.json");
-		writeFileSync(`${path}.tmp`, JSON.stringify([...this.enabled].sort((a, b) => a - b)));
-		renameSync(`${path}.tmp`, path);
+	get(conversationId: number): ChatReview {
+		const entry = this.all()[String(conversationId)];
+		return { on: entry?.on === true, reviewerModel: typeof entry?.reviewerModel === "string" ? entry.reviewerModel : undefined };
+	}
+	isOn(conversationId: number): boolean {
+		return this.get(conversationId).on;
+	}
+	// Changes only the given fields. reviewerModel: "" or null clears it (back to the chat's model).
+	update(conversationId: number, patch: { on?: boolean; reviewerModel?: string | null }): ChatReview {
+		const data = readSettingsFile(this.dataDir);
+		const reviews = this.all();
+		const current = this.get(conversationId);
+		const next: ChatReview = { on: patch.on ?? current.on, reviewerModel: current.reviewerModel };
+		if (patch.reviewerModel !== undefined) next.reviewerModel = patch.reviewerModel ? patch.reviewerModel : undefined;
+		reviews[String(conversationId)] = next;
+		writeSettingsFile(this.dataDir, { ...data, reviews });
+		return next;
 	}
 }
 
@@ -78,7 +106,7 @@ function textOf(message: Message | undefined): string {
 	return "";
 }
 
-type ReviewInput = { request: string; answer: string };
+type ReviewInput = { request: string; answer: string; reviewerModel?: string };
 type ReviewState = { phase: "review" };
 
 // The review, as a durable task. It asks the chat's model (the agent's model), writes the verdict as a transcript
@@ -94,9 +122,13 @@ export const ReviewTask = defineTask<ReviewInput, ReviewState, YieldDecision, ob
 			const agent = await runtime.agent(context);
 			let verdict: { kind: "pass" } | { kind: "fail"; notes: string } | { kind: "error"; notes: string };
 			let decision: YieldDecision = {};
+			let reviewer = "";
 			try {
 				const modelRef = agent.model;
-				const model = modelRef ? runtime.models.getModel(modelRef.provider, modelRef.modelId) : undefined;
+				const provider = modelRef?.provider ?? "anthropic";
+				const modelId = task.input.reviewerModel ?? modelRef?.modelId;
+				const model = modelId ? runtime.models.getModel(provider, modelId) : undefined;
+				reviewer = modelId ?? "";
 				if (!model) throw new Error("no model for the reviewer");
 				const reply = await completeSimple(model as never, {
 					messages: [{ role: "user", content: buildReviewPrompt(task.input.request, task.input.answer), timestamp: Date.now() }],
@@ -115,7 +147,7 @@ export const ReviewTask = defineTask<ReviewInput, ReviewState, YieldDecision, ob
 			await runtime.commit(async (tx) => {
 				await handle.submit(tx, {
 					type: "write",
-					entry: { kind: ANSWER_REVIEW_KIND, data: { verdict: verdict.kind, notes: "notes" in verdict ? verdict.notes : "" } },
+					entry: { kind: ANSWER_REVIEW_KIND, data: { verdict: verdict.kind, notes: "notes" in verdict ? verdict.notes : "", reviewer } },
 				});
 				return { status: "terminal", outcome: { status: "completed", result: decision } };
 			}, context);
@@ -140,7 +172,8 @@ export function reviewExtension(settings: ReviewSettings) {
 					const latest = page.items.find((e: EntryRecord) => e.kind === "pi.user");
 					const text = textOf(latest?.model?.[0]);
 					if (!text || text.startsWith(REVIEW_MARK)) return undefined;
-					return { tasks: [hookTask(ReviewTask, { request: text, answer: answerText(answer) })] };
+					const reviewerModel = settings.get(api.conversationId).reviewerModel;
+					return { tasks: [hookTask(ReviewTask, { request: text, answer: answerText(answer), ...(reviewerModel ? { reviewerModel } : {}) })] };
 				},
 			}),
 		],

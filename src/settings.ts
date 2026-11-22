@@ -48,21 +48,32 @@ export function compactionFor(s: ChatSettings, info: ModelInfo) {
 	};
 }
 
-export function loadSettings(dataDir: string): ChatSettings | undefined {
+// settings.json holds the global chat settings and, under "reviews", per-chat answer review settings (review.ts).
+export function readSettingsFile(dataDir: string): Record<string, unknown> {
 	try {
-		const raw = JSON.parse(readFileSync(join(dataDir, "settings.json"), "utf8")) as Partial<ChatSettings>;
-		if (typeof raw.modelId === "string" && typeof raw.contextLimit === "number") {
-			return { modelId: raw.modelId, contextLimit: raw.contextLimit, maxTurns: typeof raw.maxTurns === "number" ? raw.maxTurns : DEFAULT_MAX_TURNS };
-		}
+		const raw = JSON.parse(readFileSync(join(dataDir, "settings.json"), "utf8")) as unknown;
+		return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
 	} catch {
-		// No saved settings yet, or unreadable: fall back to defaults.
+		return {};
+	}
+}
+
+export function writeSettingsFile(dataDir: string, data: Record<string, unknown>): void {
+	mkdirSync(dataDir, { recursive: true });
+	const path = join(dataDir, "settings.json");
+	writeFileSync(`${path}.tmp`, JSON.stringify(data, null, 2));
+	renameSync(`${path}.tmp`, path);
+}
+
+export function loadSettings(dataDir: string): ChatSettings | undefined {
+	const raw = readSettingsFile(dataDir) as Partial<ChatSettings>;
+	if (typeof raw.modelId === "string" && typeof raw.contextLimit === "number") {
+		return { modelId: raw.modelId, contextLimit: raw.contextLimit, maxTurns: typeof raw.maxTurns === "number" ? raw.maxTurns : DEFAULT_MAX_TURNS };
 	}
 	return undefined;
 }
 
+// Keeps the other keys of settings.json (the per-chat review settings) when the chat settings change.
 export function saveSettings(dataDir: string, s: ChatSettings): void {
-	mkdirSync(dataDir, { recursive: true });
-	const path = join(dataDir, "settings.json");
-	writeFileSync(`${path}.tmp`, JSON.stringify(s, null, 2));
-	renameSync(`${path}.tmp`, path);
+	writeSettingsFile(dataDir, { ...readSettingsFile(dataDir), ...s });
 }

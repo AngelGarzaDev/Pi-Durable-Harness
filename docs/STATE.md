@@ -1,34 +1,23 @@
 # STATE
 
 ## Summary
-pi-durable-web: browser chat for Claude on Pi Durable 1.6.0, running in Docker at http://127.0.0.1:8787.
-Built: login with token and lockout, dark UI, settings (model, "Compact at" limit, max tool rounds), manual and
-automatic compaction, steer (joins after the current tool step, tooltip + NOTES), fork, reset with handoff, multiple
-chats, turn-limit notice in the transcript, and answer review (per chat, off by default; reviewer = chat's model;
-one retry; every review shows in the transcript).
-Default model claude-haiku-5-5, 100,000-token limit.
+All three mission goals are done: turn-limit notice (goal 1), steer timing (goal 2), answer review (goal 3).
+Review now has a per-chat reviewer model (default: the chat's model) and stores its settings in settings.json.
+Deployed (`docker compose up -d --build`), healthz ok.
 
 ## Current task
-Goals 1-3 of <host-dir>/AGENTS.md are implemented and checked. Review work is ready to commit.
-
-## Next step
-Commit the review work (src/review.ts, public/review-view.js, tests/review.test.ts, harness/server/app/index changes,
-docs). Then stop: all three goals are done.
+Done: review gaps closed (reviewer model setting, settings.json, parser fix, sonnet check). Next: commit.
 
 ## How to run and test
-- Typecheck: `npm run typecheck`; tests: `npm test` (20 passing)
-- Deploy: `docker compose up -d --build`; `curl -s http://127.0.0.1:8787/healthz` = ok
-- Live check scripts (not in repo): /tmp/live-review.mjs pass|fail|claim (WebSocket client, reads secrets/app_token, never prints it).
+- `npm run typecheck && npm test` (23 tests pass)
+- Deploy: `docker compose up -d --build`; check `curl -s http://127.0.0.1:8787/healthz`
 
-## Known failures
-- Reviewer (haiku) passes wrong arithmetic (17x23=400). Recorded in NOTES; not fixed.
-- Earlier model `write` then `read` of turn-test.txt reported ENOENT. Cause found earlier (see NOTES 1.3).
+## Known issues
+- Haiku reviewer missed 17×23=400 earlier. Sonnet reviewer catches it (NOTES 2026-11-22).
+- Review parser fixed for replies that put PASS on the last line.
 
 ## Needs you
-- Test chats (about six) and workspace test files (s1-s3.txt, turnlimit.txt, turn-test.txt, docker-ok.txt, race-test.txt,
-  a1-a4.txt from live tests) remain. Delete only on approval.
-- Review defaults (same model, off by default, one retry) were chosen by the agent; confirm.
-- Unclear item from the earlier session: "Start in the order you provided". Not acted on.
+- Test chats in the app data volume (chat ids include 400, 414, and older ones). Not deleted: no safe delete path. Say if you want them removed.
 
-## Blocked
-(none)
+## Done this session
+- Workspace test files deleted (15 files, approved).

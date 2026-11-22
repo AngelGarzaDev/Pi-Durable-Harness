@@ -65,6 +65,7 @@ button:hover { background: #3a4150; }
     <label title="A second check on each answer. A reviewer asks this chat's model whether the answer is correct; a FAIL sends it back once. Only this chat.">
       <input type="checkbox" id="review"> Review answers
     </label>
+    <select id="reviewer" title="Model that checks each answer when review is on. Same as chat uses this chat's model."></select>
     <button type="button" id="stop">Abort</button>
     <button type="button" id="compact" title="Summarize older messages to free up room">Compact</button>
     <button type="button" id="reset" title="Start a fresh context. Old messages stay visible but Claude stops seeing them.">New context</button>

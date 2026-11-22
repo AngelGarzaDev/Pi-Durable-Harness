@@ -91,12 +91,11 @@ ws.onmessage = (e) => {
 	if (msg.type === "view") {
 		render(msg.view.entries);
 		showNotice(msg.notice);
-		reviewBox.checked = !!msg.review;
+		showReview(msg.review);
 	} else if (msg.type === "review") {
-		reviewBox.checked = msg.on;
+		showReview(msg);
 		settingsMsg.textContent = msg.on ? "Review is on for this chat." : "Review is off for this chat.";
-	}
-	else if (msg.type === "open") {
+	} else if (msg.type === "open") {
 		openId = msg.conversationId;
 		titleEl.textContent = msg.title;
 		status.textContent = "connected";
@@ -122,8 +121,15 @@ document.getElementById("f").onsubmit = (e) => {
 document.getElementById("steer").onclick = () => send("steer");
 document.getElementById("new").onclick = () => ws.send(JSON.stringify({ type: "new" }));
 document.getElementById("stop").onclick = () => ws.send(JSON.stringify({ type: "abort" }));
+// Per-chat answer review: the checkbox turns it on, the dropdown picks the reviewer model ("" = the chat's model).
 const reviewBox = document.getElementById("review");
+const reviewerSelect = document.getElementById("reviewer");
 reviewBox.onchange = () => ws.send(JSON.stringify({ type: "review", on: reviewBox.checked }));
+reviewerSelect.onchange = () => ws.send(JSON.stringify({ type: "review", reviewerModel: reviewerSelect.value }));
+function showReview(r) {
+	reviewBox.checked = !!r?.on;
+	reviewerSelect.value = r?.reviewerModel ?? "";
+}
 document.getElementById("compact").onclick = () => ws.send(JSON.stringify({ type: "compact" }));
 document.getElementById("reset").onclick = () => {
 	const note = prompt("Optional note to carry over into the fresh context (leave empty for none):", "");
@@ -146,6 +152,9 @@ function showSettings(msg) {
 		o.textContent = `${m.name} (${m.contextWindow.toLocaleString("en-US")} window)`;
 		modelSelect.appendChild(o);
 	}
+	reviewerSelect.textContent = "";
+	reviewerSelect.appendChild(new Option("Reviewer: same as chat", ""));
+	for (const m of msg.models) reviewerSelect.appendChild(new Option(m.name, m.id));
 	modelSelect.value = msg.settings.modelId;
 	limitInput.value = msg.settings.contextLimit;
 	maxTurnsInput.value = msg.settings.maxTurns;
