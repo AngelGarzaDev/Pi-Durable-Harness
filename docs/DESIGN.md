@@ -20,7 +20,7 @@ Available Claude model ids in pi-ai 1.6-era catalog include claude-sonnet-5, cla
 
 ## Goal
 
-A browser UI served from this host (`the host`) in a Docker container. From a web page you can:
+A browser UI served from this host (the host) in a Docker container. From a web page you can:
 
 1. Create and list conversations (root and forks).
 2. Send messages and watch the answer stream in live.
@@ -130,7 +130,7 @@ Design: two containers, split by trust.
 Hardening for both containers:
 - Non-root: `user: 10001:10001` in compose, and `USER` in the Dockerfile. No `privileged`, no `--pid=host`, no `--network=host`.
 - `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, read-only root filesystem (writable only `/tmp` and the volume it needs).
-- No docker socket, no host paths except the named volumes. The Docker group membership of the host user the host user is root-equivalent on the host, so nothing mounts the socket.
+- No docker socket, no host paths except the named volumes. The Docker group membership of the host user is root-equivalent on the host, so nothing mounts the socket.
 - Runner path checks: resolve every path and reject anything outside `/workspace` (symlink-aware).
 - `app` port published on `127.0.0.1:8787` only.
 
@@ -147,7 +147,7 @@ Open decisions:
 ## Phase 1 record (in progress)
 
 - Auth decision (m00128): Anthropic API key, delivered as a Docker secret file. Compose will mount `./secrets/anthropic_api_key` at `/run/secrets/anthropic_api_key`. The app reads it once at startup (`src/config.ts` `readApiKey`, which requires an `sk-ant-` prefix) and sets it in process memory only. The key is never an env var in compose and never logged.
-- Secret file ownership: compose bind-mounts the host file, so it must be readable by the container UID. Plan: `app` runs as the host UID of the host user (1000) with the file mode 0400. Note: this UID is non-root but not separate from the host user; the runner container must use a different UID with no secret access.
+- Secret file ownership: compose bind-mounts the host file, so it must be readable by the container UID. Plan: `app` runs as UID 1000 (the usual first host user) with the file mode 0400. Note: this UID is non-root but not separate from the host user; the runner container must use a different UID with no secret access.
 - Files: `src/config.ts`, `src/harness.ts` (opens Harness over `data/session.sqlite`, root conversation, `harness.resume()`), `src/server.ts` (HTTP static + `/healthz`, WebSocket `/ws`: server pushes full `ConversationView` on each change; client sends `submit` (whenBusy steer|followUp) and `abort`), `public/` (plain test page; React UI in Phase 2).
 - Not yet done: auth token on WebSocket (planned), tool environment and runner container (Phase 1b / 4), real key, typecheck of runtime behaviour.
 - Open: runner internet access; rootless Podman vs Docker.
