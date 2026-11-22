@@ -1,0 +1,79 @@
+# PRODUCTION stack for personal use. Separate project, port, volumes and secrets from the dev stack (../../compose.yaml).
+# Read docs/PRODUCTION.md before changing anything here. Do not run `docker compose down -v` in this directory.
+name: pi-durable-prod
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: app
+      args: { APP_UID: "${HOST_UID:-1000}", APP_GID: "${HOST_GID:-1000}" }
+    image: pi-durable-prod-app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATA_DIR: /data
+      RUNNER_URL: http://runner:7000
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      APP_TOKEN_FILE: /run/secrets/app_token
+      RUNNER_TOKEN_FILE: /run/secrets/runner_token
+      ANTHROPIC_MODEL: claude-haiku-5-5
+    secrets: [anthropic_api_key, app_token, runner_token]
+    volumes: ["app-data:/data"]
+    ports: ["127.0.0.1:8790:8787"]
+    networks: [edge, tools]
+    depends_on:
+      runner: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  runner:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: runner
+      args: { APP_UID: "${HOST_UID:-1000}", APP_GID: "${HOST_GID:-1000}" }
+    image: pi-durable-prod-runner:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      RUNNER_HOST: 0.0.0.0
+      RUNNER_PORT: "7000"
+      WORKSPACE_DIR: /workspace
+      RUNNER_TOKEN_FILE: /run/secrets/runner_token
+    secrets: [runner_token]
+    volumes: ["workspace:/workspace"]
+    networks: [tools]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  edge: {}
+  tools: { internal: true }
+
+secrets:
+  anthropic_api_key:
+    file: ./secrets/anthropic_api_key
+  app_token:
+    file: ./secrets/app_token
+  runner_token:
+    file: ./secrets/runner_token
+
+volumes:
+  app-data: {}
+  workspace: {}

@@ -3,3 +3,7 @@ dist/
 data/
 secrets/
 .env
+# Production deployment: its own secrets and .env (never commit)
+deploy/production/secrets/
+deploy/production/.env
+.deployed-commit
