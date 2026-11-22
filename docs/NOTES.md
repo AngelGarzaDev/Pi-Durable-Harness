@@ -70,3 +70,9 @@
 - Trade-off: runner shares the host uid. Documented in SECURITY.md.
 - Workspace volume was owned by 10001; chowned to 1000:1000 once (it was empty). README has the upgrade command.
 - Verified: `docker compose up -d --build` healthy, app uid 1000, runner uid 1000 writes to /workspace, healthz ok. Not verified with a second real host user (no second account available); the build-arg path was checked with `HOST_UID=4321 docker compose config` which showed APP_UID "4321".
+
+## 2026-11-22 Verification record (goal 4.6) and superseded notes
+- Superseded: the "Deploy surprise" entry above (chmod 644 + chcon on runner_token) is no longer the approach. Since 2c80f74 the containers run as the host user's uid, and secrets stay mode 600.
+- Smoke test run against the running stack (no secret values printed): POST /login with the app token -> 200 and a session cookie; GET / with cookie -> 200; GET / without cookie -> 302 to /login; POST /login with a wrong token -> 401 {"ok":false}. WebSocket /ws with cookie and origin http://127.0.0.1:8787 -> opens; with origin http://evil.example -> rejected (401). The check script was run from the repo and deleted afterwards.
+- Also verified: npm run typecheck clean; npm test 51 pass; docker compose up -d --build healthy; app and runner uid 1000; runner can write /workspace.
+- Not verified: a second real host user (no second account here). Git history was rewritten once (2da46e6 era); no secret value appears in tree or history (scan by grep of tracked files and history for /var/home, htpc, 192.168, angel, and the secret file contents).

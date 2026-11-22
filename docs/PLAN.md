@@ -26,4 +26,8 @@ Source: independent read-only review (findings numbered as in that review; full 
 - [x] 4.3 Process: unhandled rejection logging and close-handler catch (F7), graceful shutdown with client close and timeout (F18), paginate chat list and applyToAll past 200 (F10).
 - [x] 4.4 Packaging: prod-only install in Docker (F20), drop unused React/Vite, tsx as runtime dep, license field AGPL-3.0-or-later, fix `start` script, compose runner_token secret.
 - [x] 4.5 Repo hygiene: sanitize host paths/IPs/hostnames from docs and scripts, move root PLAN.md to docs/DESIGN.md, rewrite git author on history, scan full history for secrets, README (quick start, unsafe defaults noted), SECURITY.md, .gitignore.
-- [x] 4.6 Verify: typecheck, npm test, docker compose up --build, healthz, curl login and WS smoke, no secrets in `git ls-files` or history.
+- [x] 4.6 Verify: typecheck, npm test, docker compose up --build, healthz, curl login and WS smoke (done 2026-11-22: login 200/401, cookie gate 302, WS good origin opens, evil origin rejected), no secrets in `git ls-files` or history (done by grep scan).
+
+## Goal 5: documentation audit
+- [x] 5.1 Every progress item has a NOTES entry, PLAN tick and STATE update (2026-11-22).
+- [ ] 5.2 Second real host user check (needs a second account; not possible on this host).
