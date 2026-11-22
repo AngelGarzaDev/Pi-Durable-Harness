@@ -120,6 +120,10 @@ document.getElementById("f").onsubmit = (e) => {
 };
 document.getElementById("steer").onclick = () => send("steer");
 document.getElementById("new").onclick = () => ws.send(JSON.stringify({ type: "new" }));
+document.getElementById("logout").onclick = async () => {
+	await fetch("/logout", { method: "POST" });
+	location.href = "/login";
+};
 document.getElementById("stop").onclick = () => ws.send(JSON.stringify({ type: "abort" }));
 // Per-chat answer review: the checkbox turns it on, the dropdown picks the reviewer model ("" = the chat's model).
 const reviewBox = document.getElementById("review");

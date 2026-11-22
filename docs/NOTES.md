@@ -24,3 +24,14 @@
 - Lesson: an earlier arithmetic test asked the chat to give a deliberately wrong answer. The reviewer correctly judged that as matching the request, so the test proved nothing. Test the reviewer with a neutral question and a wrong answer.
 - Test chats created for these checks: 400 and 414 (review on). Not deleted (no delete path; user to decide).
 - Live-check scripts saved to durable-web/scripts/: live-chat-review.mjs (WebSocket chat check) and live-review-checks.mjs (haiku review checks, earlier run). Both need the running app and secrets/ on disk; not run by npm test.
+
+## 2026-11-22 Goal 4.1: HTTP/WebSocket hardening
+- WebSocket Origin is checked (src/guard.ts originAllowed): closes cross-site WebSocket hijacking (review F1). Requests with no Origin still need the cookie.
+- Login attempts are counted before the body is read (LoginLimiter); a 413 for an oversized body also counts. Records are pruned when quiet.
+- Static files: explicit allowlist PUBLIC_FILES; the source tree is never served (review F13).
+- Security headers on every response. CSP allows style-src 'unsafe-inline' because index.html has a <style> block and inline style attributes; scripts stay 'self' only.
+- Logout is POST (204) with a sign-out button; GET /logout no longer works (review F22).
+- Errors reach the browser as "Something went wrong (ref xxxxxxxx)"; the full error is logged on the server (review F11).
+- SECURE_COOKIES=1 adds the Secure flag for HTTPS deployments. Off by default because the default install serves plain HTTP on 127.0.0.1.
+- Sessions still never expire; the cookie is derived from the token, so rotating the token is the only revoke (review F5, accepted for now, recorded).
+- Test: tests/http.test.ts starts the real server in a child process (no model call; runner URL points at a closed port).

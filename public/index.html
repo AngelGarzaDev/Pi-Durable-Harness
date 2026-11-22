@@ -37,6 +37,7 @@ input { font: inherit; }
 button { font: inherit; background: var(--accent); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .4rem .8rem; cursor: pointer; }
 button:hover { background: #3a4150; }
 #actions { display: flex; gap: .5rem; margin-top: .5rem; flex-wrap: wrap; }
+  button.linkish { background: none; border: 0; color: inherit; padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
 </style>
 <aside id="chats">
   <h2>Chats</h2>
@@ -46,7 +47,7 @@ button:hover { background: #3a4150; }
 <div id="main">
   <div id="top">
     <h1 id="title">Pi Durable</h1>
-    <span id="status">connecting… · <a href="/logout" style="color:inherit">sign out</a></span>
+    <span id="status">connecting… · <button id="logout" type="button" class="linkish">sign out</button></span>
   </div>
   <form id="settings">
     <label>Model <select id="model"></select></label>

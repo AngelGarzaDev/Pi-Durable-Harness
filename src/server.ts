@@ -10,6 +10,7 @@ import { applySettings, context, listModels, modelInfo, openHarness } from "./ha
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationWatch, EntryId } from "@earendil-works/pi-durable";
 import { loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
+import { LoginLimiter, SECURITY_HEADERS, errorRef, originAllowed } from "./guard.js";
 
 type ClientMessage =
 	| { type: "submit"; content: string; whenBusy?: "steer" | "followUp" }
@@ -30,17 +31,30 @@ let settings: ChatSettings = initialSettings;
 const titles: Titles = loadTitles(config.dataDir);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
+// Only these files are served. Nothing else under public/ is reachable.
+const PUBLIC_FILES = new Set(["index.html", "login.html", "app.js", "login.js", "review-view.js"]);
 
 // Only these are reachable without the session cookie: health check, login page and its script.
 const OPEN_PATHS = new Set(["/healthz", "/login", "/login.html", "/login.js"]);
 const MAX_LOGIN_BODY = 1024;
+const MAX_WS_MESSAGE = 256 * 1024;
 
-// Limits wrong-token guesses per client address: after MAX_FAILS failures, sign-in is refused for LOCKOUT_MS.
-const MAX_FAILS = 5;
-const LOCKOUT_MS = 15 * 60_000;
-const failures = new Map<string, { count: number; lockedUntil: number }>();
+// Sign-in guesses per client address: after 5 wrong tokens the address is refused for 15 minutes.
+const limiter = new LoginLimiter(5, 15 * 60_000);
+// Set SECURE_COOKIES=1 when served over HTTPS (for example behind a TLS proxy).
+const SECURE = process.env.SECURE_COOKIES === "1" ? "; Secure" : "";
+const sessionCookie = (value: string, maxAge?: number) =>
+	`${SESSION_COOKIE}=${value}; HttpOnly; SameSite=Strict; Path=/${maxAge === undefined ? "" : `; Max-Age=${maxAge}`}${SECURE}`;
+
 function clientKey(req: import("node:http").IncomingMessage): string {
 	return req.socket.remoteAddress ?? "unknown";
+}
+
+// Browser-facing error: the full error goes to the log under a reference id; the client sees only the id.
+function publicError(error: unknown): string {
+	const ref = errorRef();
+	console.error(`error ${ref}:`, error);
+	return `Something went wrong (ref ${ref}).`;
 }
 
 async function readBody(req: import("node:http").IncomingMessage): Promise<string> {
@@ -55,43 +69,44 @@ async function readBody(req: import("node:http").IncomingMessage): Promise<strin
 }
 
 const server = createServer(async (req, res) => {
+	for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
 	const url = new URL(req.url ?? "/", "http://localhost");
 	if (url.pathname === "/healthz") {
 		res.writeHead(200, { "content-type": "text/plain" }).end("ok");
 		return;
 	}
 	if (url.pathname === "/login" && req.method === "POST") {
+		// The attempt is counted before the body is read, so parallel requests cannot bypass the limit.
 		const key = clientKey(req);
-		const record = failures.get(key);
-		if (record && record.lockedUntil > Date.now()) {
-			res.writeHead(429, { "content-type": "application/json", "retry-after": String(Math.ceil((record.lockedUntil - Date.now()) / 1000)) })
+		const wait = limiter.begin(key);
+		if (wait > 0) {
+			res.writeHead(429, { "content-type": "application/json", "retry-after": String(wait) })
 				.end(JSON.stringify({ ok: false, error: "too many attempts" }));
 			return;
 		}
 		try {
-			const given = String(JSON.parse(await readBody(req)).token ?? "");
+			const body = JSON.parse(await readBody(req));
+			const given = typeof body?.token === "string" ? body.token : "";
 			if (!tokenMatches(given, accessToken)) {
-				const count = (record?.count ?? 0) + 1;
-				failures.set(key, { count, lockedUntil: count >= MAX_FAILS ? Date.now() + LOCKOUT_MS : 0 });
 				res.writeHead(401, { "content-type": "application/json" }).end(JSON.stringify({ ok: false }));
 				return;
 			}
-			failures.delete(key);
+			limiter.succeeded(key);
 			res.writeHead(200, {
 				"content-type": "application/json",
-				"set-cookie": `${SESSION_COOKIE}=${sessionValue(accessToken)}; HttpOnly; SameSite=Strict; Path=/`,
+				"set-cookie": sessionCookie(sessionValue(accessToken)),
 			}).end(JSON.stringify({ ok: true }));
-		} catch {
-			res.writeHead(400).end();
+		} catch (error) {
+			if (error instanceof Error && error.message === "body too large") res.writeHead(413).end();
+			else res.writeHead(400).end();
 		}
 		return;
 	}
-	if (url.pathname === "/logout") {
-		res.writeHead(302, { location: "/login", "set-cookie": `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0` }).end();
+	if (url.pathname === "/logout" && req.method === "POST") {
+		res.writeHead(204, { "set-cookie": sessionCookie("", 0) }).end();
 		return;
 	}
-	const name = url.pathname === "/" ? "index.html" : url.pathname === "/login" ? "login.html" : normalize(url.pathname).slice(1);
-	if (name.includes("..")) return void res.writeHead(400).end();
+	const name = url.pathname === "/" ? "index.html" : url.pathname === "/login" ? "login.html" : url.pathname.slice(1);
 	const open = OPEN_PATHS.has(url.pathname);
 	if (!open && !isAuthed(req.headers.cookie, accessToken)) {
 		// Browser page requests go to the login page; anything else gets a bare 401.
@@ -102,6 +117,7 @@ const server = createServer(async (req, res) => {
 		}
 		return;
 	}
+	if (!PUBLIC_FILES.has(name)) return void res.writeHead(404).end("not found");
 	try {
 		const body = await readFile(join(publicDir, name));
 		res.writeHead(200, { "content-type": TYPES[extname(name)] ?? "application/octet-stream" }).end(body);
@@ -140,7 +156,10 @@ async function applyToAll(next: ChatSettings) {
 const wss = new WebSocketServer({
 	server,
 	path: "/ws",
-	verifyClient: ({ req }: { req: import("node:http").IncomingMessage }) => isAuthed(req.headers.cookie, accessToken),
+	maxPayload: MAX_WS_MESSAGE,
+	// Cross-site WebSocket hijacking: a browser page from another origin sends its own Origin header, so refuse it.
+	verifyClient: ({ req }: { req: import("node:http").IncomingMessage }) =>
+		originAllowed(req.headers.origin, req.headers.host) && isAuthed(req.headers.cookie, accessToken),
 });
 wss.on("connection", async (socket: WebSocket) => {
 	let active: Conversation = root;
@@ -154,7 +173,7 @@ wss.on("connection", async (socket: WebSocket) => {
 		watch = await conv.watch(context);
 		watch.start(async (call) => {
 			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id) });
-			else send({ type: "error", message: "watch failed" });
+			else send({ type: "error", message: publicError(call) });
 		});
 		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id) });
 		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat") });
@@ -164,7 +183,7 @@ wss.on("connection", async (socket: WebSocket) => {
 		send(settingsPayload());
 		send(await chatList());
 	} catch (error) {
-		send({ type: "error", message: String(error) });
+		send({ type: "error", message: publicError(error) });
 	}
 
 	socket.on("message", async (raw) => {
@@ -216,7 +235,8 @@ wss.on("connection", async (socket: WebSocket) => {
 			} else if (msg.type === "settings") {
 				const info = modelInfo(models, String(msg.modelId));
 				if (!info) return send({ type: "error", message: "Unknown model." });
-				const next: ChatSettings = { modelId: info.id, contextLimit: Number(msg.contextLimit), maxTurns: Number(msg.maxTurns) };
+				if (typeof msg.contextLimit !== "number" || typeof msg.maxTurns !== "number") return send({ type: "error", message: "Settings must be numbers." });
+				const next: ChatSettings = { modelId: info.id, contextLimit: msg.contextLimit, maxTurns: msg.maxTurns };
 				const problem = checkSettings(next, info);
 				if (problem) return send({ type: "error", message: problem });
 				await applyToAll(next);
@@ -239,12 +259,16 @@ wss.on("connection", async (socket: WebSocket) => {
 				send({ type: "error", message: "unknown message" });
 			}
 		} catch (error) {
-			send({ type: "error", message: String(error) });
+			send({ type: "error", message: publicError(error) });
 		}
 	});
 
 	socket.on("close", async () => {
-		await watch?.stop();
+		try {
+			await watch?.stop();
+		} catch (error) {
+			console.error("watch stop failed:", error);
+		}
 	});
 });
 
@@ -252,9 +276,20 @@ server.listen(config.port, config.host, () => {
 	console.log(`pi-durable-web listening on http://${config.host}:${config.port}`);
 });
 
+// A failed background promise is logged, not allowed to take the process down silently.
+process.on("unhandledRejection", (reason) => console.error("unhandled rejection:", reason));
+
+// Shutdown: stop accepting connections, close open sockets, then close the harness. Forced exit after 10 s.
 const shutdown = async () => {
+	const force = setTimeout(() => process.exit(1), 10_000);
+	force.unref();
+	for (const client of wss.clients) client.terminate();
 	server.close();
-	await harness.close(context);
+	try {
+		await harness.close(context);
+	} catch (error) {
+		console.error("harness close failed:", error);
+	}
 	process.exit(0);
 };
 process.on("SIGTERM", shutdown);
