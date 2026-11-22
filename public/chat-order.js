@@ -1,11 +1,11 @@
-// Order of the chat list: oldest first. Chat ids come from storage in creation order, so sorting by id is chronological.
-// A fork (child chat) is listed right under the chat it was branched from, also oldest first.
+// Order of the chat list: newest first (reverse chronological). Chat ids come from storage in creation order, so sorting by id descending is newest-first.
+// A fork (child chat) is listed right under the chat it was branched from, also newest first.
 export function orderChats(chats) {
 	const byId = new Map(chats.map((c) => [c.id, c]));
-	const byOldest = (a, b) => a.id - b.id;
+	const byNewest = (a, b) => b.id - a.id;
 	const kids = new Map();
 	const roots = [];
-	for (const c of [...chats].sort(byOldest)) {
+	for (const c of [...chats].sort(byNewest)) {
 		if (c.parentId && byId.has(c.parentId)) {
 			if (!kids.has(c.parentId)) kids.set(c.parentId, []);
 			kids.get(c.parentId).push(c);
