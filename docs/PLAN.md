@@ -39,3 +39,20 @@ User request: the harness presents a question; the user clicks an answer or type
 - [x] 6.3 Browser: question cards above the transcript (option buttons, own-answer field, Enter to send), public/ask-view.js helpers.
 - [x] 6.4 Live check with claude-haiku-5-5 at 100000 tokens (one question, click an option). Log cost in NOTES.md. Done via a WS script (not the browser UI): question seen, option Red sent, answer-result ok, model replied "You chose Red.". Three runs, about 3 short haiku calls each.
 - [x] 6.5 Deploy: docker compose up -d --build, healthz ok.
+
+## Goal 7: browser-entered Anthropic key (started 2026-11-22)
+User decision (m00454): allow a key entered in the browser. Reuse pi-ai's CredentialStore and api_key login flow, as Pi does.
+Storage: DATA_DIR/credentials.json, mode 600, owner the app user, inside the app-data volume. Stored key wins over the Docker secret; logout falls back to the secret.
+- [ ] 7.1 File-backed CredentialStore (src/credentials.ts) passed to createModels; pi-ai api_key login run with a browser prompt. Tests: store round trip, file mode 600, stored key used by resolve, logout falls back.
+- [ ] 7.2 WS messages `auth-status` (never returns the key, only "stored"/"secret"/"none" and last 4 chars), `auth-set` (validates sk-ant- prefix, sends a 1-token check call? NO: no live call; validate format only), `auth-clear`. Tests in tests/http.test.ts.
+- [ ] 7.3 Browser: settings panel shows key source, password field to enter/replace key, clear button.
+- [ ] 7.4 Docs: docs/NOTES.md decision (plaintext in volume vs encrypted), docs/PRODUCTION.md note; verify in dev.
+
+## Goal 8: MCP servers (started 2026-11-22)
+Architecture follows Pi: client library @earendil-works/pi-mcp@1.6.0 (pinned exact, same as pi-durable; deps: cross-spawn only). Config format like Pi's mcp.json (mcpServers map, command/args/env/cwd or url/headers). Stdio servers run in the RUNNER (no credentials, workspace only). HTTP servers run in the APP (needs internet). Tool names mcp__<server>__<tool>.
+- [ ] 8.1 Add pi-mcp dependency; config file DATA_DIR/mcp.json with validation (names [A-Za-z0-9_-], no duplicate names, exactly one of command/url). Tests for validation.
+- [ ] 8.2 Runner endpoints: POST /mcp/start, /mcp/stop, GET /mcp/tools, POST /mcp/call (bearer-protected, body capped), stdio via StdioTransport. Tests in tests/runner-mcp.test.ts with a tiny stdio MCP fixture server.
+- [ ] 8.3 App: HTTP servers via StreamableHttpTransport; tool adapter to pi-durable tool registry (exposure direct|hidden; deferred and codemode not in first pass). Tests with an in-process HTTP fixture.
+- [ ] 8.4 WS messages `mcp-list`, `mcp-add`, `mcp-remove`, `mcp-reconnect` with status (state, tool count, error). Browser panel to list/add/remove.
+- [ ] 8.5 Live check: one stdio fixture server (no internet needed) then a haiku call that uses its tool (dev only, haiku-5-5, 100000 limit). Log in NOTES.md.
+- [ ] 8.6 Not in first pass (record in NOTES): OAuth for remote servers, deferred/codemode exposure, project-level config, /login-style MCP sign-in.
