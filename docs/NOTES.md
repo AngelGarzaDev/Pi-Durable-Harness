@@ -148,3 +148,7 @@
 - Project-level config (only DATA_DIR/mcp.json).
 - /login-style sign-in for MCP servers.
 - Runner stdio: anyone who can add a server can run its command in the runner (no credentials, workspace volume only).
+
+## 2026-11-22 push to origin (user m00833)
+- Pushing now works. The user authorised it and pointed to the key in secrets/github_repo_api_key (mode 600, gitignored). Push used a temporary GIT_ASKPASS script in /tmp that printed the key from that file and was deleted afterwards. The remote URL stays credential-free and the key is not in git or the transcript.
+- Command: GIT_ASKPASS=<script> GIT_TERMINAL_PROMPT=0 git push origin HEAD → main 5f550bc..5b9938c.
