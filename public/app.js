@@ -34,6 +34,13 @@ function items(entry) {
 }
 
 // Branch button on user and Claude messages: forks the chat up to and including that entry.
+// Notice above the transcript when the newest run ended without an answer (for example the turn limit).
+function showNotice(text) {
+	const el = document.getElementById("notice");
+	el.textContent = text ?? "";
+	el.hidden = !text;
+}
+
 function render(entries) {
 	out.textContent = "";
 	for (const e of entries) {
@@ -77,7 +84,10 @@ ws.onopen = () => (status.textContent = "connected");
 ws.onclose = () => (status.textContent = "disconnected, reload to reconnect");
 ws.onmessage = (e) => {
 	const msg = JSON.parse(e.data);
-	if (msg.type === "view") render(msg.view.entries);
+	if (msg.type === "view") {
+		render(msg.view.entries);
+		showNotice(msg.notice);
+	}
 	else if (msg.type === "open") {
 		openId = msg.conversationId;
 		titleEl.textContent = msg.title;

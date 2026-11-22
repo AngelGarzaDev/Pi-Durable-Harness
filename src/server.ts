@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { failureNotice } from "./notice.js";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -151,10 +152,10 @@ wss.on("connection", async (socket: WebSocket) => {
 		active = conv;
 		watch = await conv.watch(context);
 		watch.start(async (call) => {
-			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id });
+			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs) });
 			else send({ type: "error", message: "watch failed" });
 		});
-		send({ type: "view", view: watch.value, conversationId: conv.id });
+		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs) });
 		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat") });
 	};
 	try {

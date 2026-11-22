@@ -28,6 +28,7 @@ h1 { font-size: 1.3rem; margin: 0; }
 .tool-result { color: var(--result-fg); background: var(--result-bg); }
 .tool-error { color: var(--error-fg); background: var(--error-bg); }
 .other { color: var(--muted); font-size: .8rem; }
+.notice { color: #f0c674; background: #2e2818; border: 1px solid #5b4a1e; border-radius: 4px; padding: .4rem .6rem; margin: .5rem 0; }
 .branch { font-size: .75rem; padding: .1rem .4rem; margin-left: .5rem; vertical-align: middle; }
 form.bar { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
 input { font: inherit; }
@@ -52,6 +53,7 @@ button:hover { background: #3a4150; }
     <label>Max tool rounds <input id="maxturns" type="number" min="1" step="1" style="width:6rem"></label>
     <button type="submit">Apply</button> <span id="settings-msg"></span>
   </form>
+  <div id="notice" class="notice" hidden></div>
   <div id="transcript"></div>
   <form id="f" class="bar">
     <input id="msg" autofocus placeholder="Type a message">
