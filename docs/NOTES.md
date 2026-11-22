@@ -123,3 +123,11 @@
 - A failed server is recorded in mcp.list() with state "error"; start() never throws. Tests: tests/mcp-http.test.ts (2), in-process HTTP fixture.
 - Not covered by a test yet: app-side stdio path end to end (covered by runner-mcp.test.ts only). Live check is 8.5.
 - Not yet verified: whether a chat that is already open sees a server added later. Check in 8.4 / 8.5.
+
+## 2026-11-22 goal 8.4: MCP WebSocket messages and browser panel
+- WS: mcp-list, mcp-add {name, config}, mcp-remove {name}, mcp-reconnect {name}. Replies {type:"mcp", servers, configErrors}; refusals come back as {type:"error"}.
+- configErrors is re-read from mcp.json on every reply, so a bad file shows up right away.
+- Browser panel is a <details> block above the chat (public/index.html #mcp, public/app.js showMcp). Text is set with textContent only.
+- Tests: tests/mcp-ws.test.ts (5), spawns the real server and an in-process HTTP fixture. Suite 79 passing.
+- Not clicked in a real browser yet: TO TEST LATER with the goal 7 key row and the goal 6 question card.
+- Pushing failed: no GitHub credentials on this host (git: "could not read Username for 'https://github.com'"). The user authorised pushes (m00748) but credentials are needed. Commits are local only.

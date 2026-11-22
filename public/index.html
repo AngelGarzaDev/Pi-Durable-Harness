@@ -22,6 +22,14 @@ h1 { font-size: 1.3rem; margin: 0; }
 .keyrow { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: 0 0 .75rem; color: var(--muted); font-size: .85rem; }
 .keyrow input { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .3rem; width: 16rem; }
 #keymsg { color: var(--muted); }
+#mcp { margin: 0 0 .75rem; color: var(--muted); font-size: .85rem; }
+#mcp summary { cursor: pointer; }
+#mcp ul { list-style: none; padding: 0; margin: .4rem 0; }
+#mcp li { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; padding: .15rem 0; }
+#mcp .state-error { color: #e07070; }
+#mcp .state-ready { color: #7fc27f; }
+#mcp form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+#mcp input { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: .3rem; }
 #transcript { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-y: auto; white-space: pre-wrap; background: var(--panel); min-height: 12rem; }
 .user, .assistant { margin: .5rem 0; }
 .user { color: var(--user); }
@@ -72,6 +80,18 @@ button:hover { background: #3a4150; }
     <button type="button" id="keyclear" title="Remove the key entered here. The Docker secret, if any, is used again.">Remove browser key</button>
     <span id="keymsg"></span>
   </form>
+  <details id="mcp">
+    <summary>MCP servers <span id="mcpcount"></span></summary>
+    <ul id="mcplist"></ul>
+    <div id="mcperrors"></div>
+    <form id="mcpform">
+      <input id="mcpname" placeholder="name (letters, digits, - _)" size="18" autocomplete="off">
+      <input id="mcptarget" placeholder="https://… (remote) or program, e.g. node" size="30" autocomplete="off">
+      <input id="mcpargs" placeholder="arguments (program only, space-separated)" size="26" autocomplete="off">
+      <button type="submit" title="Local programs run inside the runner, which has no credentials. Remote URLs are reached from the app.">Add server</button>
+      <span id="mcpmsg"></span>
+    </form>
+  </details>
   <div id="notice" class="notice" hidden></div>
   <div id="questions"></div>
   <div id="transcript"></div>

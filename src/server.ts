@@ -12,6 +12,7 @@ import { applySettings, context, listModels, modelInfo, openHarness } from "./ha
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
+import { readMcpConfig } from "./mcp-config.js";
 import { LoginLimiter, SECURITY_HEADERS, errorRef, originAllowed } from "./guard.js";
 
 type ClientMessage =
@@ -30,11 +31,16 @@ type ClientMessage =
 	// Anthropic key from the browser. The key is only ever sent TO the server; no message returns it.
 	| { type: "auth-status" }
 	| { type: "auth-set"; key: string }
-	| { type: "auth-clear" };
+	| { type: "auth-clear" }
+	// MCP servers (goal 8). mcp-add takes one entry in Pi's mcpServers shape; a name already in use is refused.
+	| { type: "mcp-list" }
+	| { type: "mcp-add"; name: string; config: Record<string, unknown> }
+	| { type: "mcp-remove"; name: string }
+	| { type: "mcp-reconnect"; name: string };
 
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
-const { harness, root, models, settings: initialSettings, reviews, credentials, secretKey } = await openHarness(config);
+const { harness, root, models, settings: initialSettings, reviews, credentials, secretKey, mcp } = await openHarness(config);
 let settings: ChatSettings = initialSettings;
 const titles: Titles = loadTitles(config.dataDir);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
@@ -290,6 +296,18 @@ wss.on("connection", async (socket: WebSocket) => {
 			} else if (msg.type === "auth-clear") {
 				await clearAnthropicKey(models);
 				send({ type: "auth", anthropic: await anthropicStatus(credentials, secretKey) });
+			} else if (msg.type === "mcp-list") {
+				send(mcpReply());
+			} else if (msg.type === "mcp-add" || msg.type === "mcp-remove" || msg.type === "mcp-reconnect") {
+				const name = typeof msg.name === "string" ? msg.name : "";
+				let problem: string | undefined;
+				if (msg.type === "mcp-add") {
+					if (typeof msg.config !== "object" || msg.config === null || Array.isArray(msg.config)) problem = "config must be an object";
+					else problem = await mcp.add(name, msg.config);
+				} else if (msg.type === "mcp-remove") problem = await mcp.remove(name);
+				else problem = await mcp.reconnect(name);
+				if (problem) return send({ type: "error", message: problem });
+				send(mcpReply());
 			} else {
 				send({ type: "error", message: "unknown message" });
 			}
@@ -314,12 +332,18 @@ server.listen(config.port, config.host, () => {
 // A failed background promise is logged, not allowed to take the process down silently.
 process.on("unhandledRejection", (reason) => console.error("unhandled rejection:", reason));
 
+// Server list for the browser: live status plus the problems in mcp.json as it is now.
+function mcpReply() {
+	return { type: "mcp", servers: mcp.list(), configErrors: readMcpConfig(join(config.dataDir, "mcp.json")).errors };
+}
+
 // Shutdown: stop accepting connections, close open sockets, then close the harness. Forced exit after 10 s.
 const shutdown = async () => {
 	const force = setTimeout(() => process.exit(1), 10_000);
 	force.unref();
 	for (const client of wss.clients) client.terminate();
 	server.close();
+	await mcp.stopAll().catch(() => {});
 	try {
 		await harness.close(context);
 	} catch (error) {

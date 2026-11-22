@@ -144,6 +144,7 @@ function renderChats(chats) {
 ws.onopen = () => {
 	status.textContent = "connected";
 	ws.send(JSON.stringify({ type: "auth-status" }));
+	ws.send(JSON.stringify({ type: "mcp-list" }));
 };
 ws.onclose = () => (status.textContent = "disconnected, reload to reconnect");
 ws.onmessage = (e) => {
@@ -173,8 +174,10 @@ ws.onmessage = (e) => {
 		status.textContent = "error: " + msg.message;
 		settingsMsg.textContent = msg.message;
 		keyMsg.textContent = msg.message;
+		mcpMsg.textContent = msg.message;
 	} else if (msg.type === "settings") showSettings(msg);
 	else if (msg.type === "auth") showKey(msg.anthropic);
+	else if (msg.type === "mcp") showMcp(msg);
 };
 
 const input = document.getElementById("msg");
@@ -269,4 +272,51 @@ document.getElementById("keyform").onsubmit = (e) => {
 keyClear.onclick = () => {
 	if (!confirm("Remove the key entered in the browser? The Docker secret is used again if there is one.")) return;
 	ws.send(JSON.stringify({ type: "auth-clear" }));
+};
+
+// MCP servers panel. Text is set with textContent only; server names and errors come from the server.
+const mcpList = document.getElementById("mcplist");
+const mcpErrors = document.getElementById("mcperrors");
+const mcpMsg = document.getElementById("mcpmsg");
+function showMcp(info) {
+	document.getElementById("mcpcount").textContent = info.servers.length ? `(${info.servers.length})` : "";
+	mcpList.replaceChildren();
+	for (const s of info.servers) {
+		const li = document.createElement("li");
+		const text = document.createElement("span");
+		text.textContent = `${s.name} · ${s.kind} · ${s.toolCount} tool${s.toolCount === 1 ? "" : "s"} · `;
+		const state = document.createElement("span");
+		state.className = "state-" + s.state;
+		state.textContent = s.state + (s.error ? `: ${s.error}` : "");
+		const reconnect = document.createElement("button");
+		reconnect.type = "button";
+		reconnect.textContent = "Reconnect";
+		reconnect.onclick = () => ws.send(JSON.stringify({ type: "mcp-reconnect", name: s.name }));
+		const remove = document.createElement("button");
+		remove.type = "button";
+		remove.textContent = "Remove";
+		remove.onclick = () => {
+			if (confirm(`Remove MCP server "${s.name}"?`)) ws.send(JSON.stringify({ type: "mcp-remove", name: s.name }));
+		};
+		li.append(text, state, reconnect, remove);
+		mcpList.appendChild(li);
+	}
+	if (!info.servers.length) mcpList.textContent = "No servers yet.";
+	mcpErrors.textContent = info.configErrors.length ? "Problems in mcp.json: " + info.configErrors.join("; ") : "";
+	mcpMsg.textContent = "";
+}
+document.getElementById("mcpform").onsubmit = (e) => {
+	e.preventDefault();
+	const name = document.getElementById("mcpname").value.trim();
+	const target = document.getElementById("mcptarget").value.trim();
+	const args = document.getElementById("mcpargs").value.trim();
+	if (!name || !target) return (mcpMsg.textContent = "Enter a name and a URL or program.");
+	const config = /^https?:\/\//.test(target)
+		? { url: target }
+		: { command: target, ...(args ? { args: args.split(/\s+/) } : {}) };
+	mcpMsg.textContent = "Connecting…";
+	ws.send(JSON.stringify({ type: "mcp-add", name, config }));
+	document.getElementById("mcpname").value = "";
+	document.getElementById("mcptarget").value = "";
+	document.getElementById("mcpargs").value = "";
 };
