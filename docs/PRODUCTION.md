@@ -71,3 +71,4 @@ Never `down -v`.
 - MCP servers: DATA_DIR/mcp.json in the app-data volume. Local programs run inside the runner (no credentials).
 - 2026-11-22: production updated d54cb01 → a329be2 (edit an MCP server). Backup first: deploy/production/backup/app-data-pre-edit-2026-11-22-1738.tgz (ignored by git). Checks: healthz ok, WS auth-status and mcp-list answer.
 - 2026-11-22: production updated a329be2 → 2a08cad (markdown, UI restyle, chat bubbles, chronological chat list). Backup first: deploy/production/backup/app-data-pre-chatorder-2026-11-22-1755.tgz (git-ignored). Checks: healthz ok, WS auth-status and mcp-list answer. No model call.
+- 2026-11-22: production updated 2a08cad → 5185cc3 (chat list newest first, per user m01121). Backup: deploy/production/backup/app-data-pre-chatorder-rev-2026-11-22-*.tgz (git-ignored). healthz ok.

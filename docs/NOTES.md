@@ -194,3 +194,4 @@
 
 ## 2026-11-22 production deploy 2a08cad (user m01101)
 - Backup by streaming tar (bind mount not used). deploy.sh → healthy at 8790, .deployed-commit 2a08cad. Read-only WS checks only.
+- 2026-11-22 prod 5185cc3: chat list order corrected to reverse chronological (newest first). Deployed after backup.
