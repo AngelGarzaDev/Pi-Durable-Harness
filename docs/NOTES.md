@@ -156,3 +156,10 @@
 ## 2026-11-22 production deploy d54cb01 (user m00862)
 - Backup first (deploy/production/backup/app-data-pre-goal8-2026-11-22-1725.tgz). Then deploy/production/deploy.sh → healthy at 8790, .deployed-commit = d54cb01.
 - Post-deploy read-only WS check via a temp script (removed): auth-status → source "secret", mcp-list → 0 servers. No live model call on production.
+
+## 2026-11-22 production network check (user question m00884)
+- Networks: edge (bridge, NAT to outside, 172.23.0.0/16) = app; tools (internal:true, 172.22.0.0/16) = app and runner.
+- Runner (the bash/read/write tools' container): no route. 192.168.1.1:443, 10.0.0.1, 192.168.10.10:445 and example.com all fail with ENETUNREACH / EAI_AGAIN.
+- App container: reaches the LAN and internet. TCP open: 192.168.1.1:443, 192.168.1.30:22 (host sshd), 192.168.10.10:445 (SMB), 172.17.0.1:22. https://example.com returns 200.
+- Consequence: the app holds the Anthropic key and makes http MCP connections (StreamableHttpTransport), so an http MCP URL pointing at a LAN device is reachable. Model-driven tool calls run in the runner, which cannot reach the LAN.
+- Not changed. Options for the user: (a) put app on tools only and move the Anthropic call out of the LAN-capable network (app still needs internet for api.anthropic.com, so a proxy/allowlist is needed); (b) add an egress firewall rule (DOCKER-USER) to block 192.168.0.0/16, 10.0.0.0/8 and 172.16.0.0/12 from 172.23.0.0/16; (c) keep as is and accept it.
