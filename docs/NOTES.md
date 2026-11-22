@@ -49,3 +49,10 @@
 - Chat list and "apply to all chats" follow scanConversations cursors (collectPages in src/chats.ts); before, both stopped at 200 chats (review F10). Tested with tests/collect-pages.test.ts.
 - unhandledRejection is logged instead of ignored; watch stop errors are logged (F7). Shutdown terminates WebSocket clients, closes the HTTP server, closes the harness, and forces exit after 10 s (F18).
 - Accepted and recorded: sessions do not expire and logout does not revoke the cookie (F5). The cookie is HMAC-like (sha256 of "session:"+token), so changing secrets/app_token is the only revoke. Documented in SECURITY.md.
+
+## 2026-11-22 Goal 4.4: packaging
+- License field is AGPL-3.0-or-later (LICENSE at repo root is the AGPL-3.0 text). Name and description set; the stale "main": "index.js" and empty author removed.
+- Removed unused React, react-dom, vite, and their @types (the UI is plain JS in public/). The "build" script (tsc plus vite, vite not configured) is gone; "start" runs src/server.ts through tsx, "start:runner" runs the runner. Previously "start" pointed at dist/server.js, which was never built.
+- tsx moved to dependencies because the production images run the TypeScript source directly. Production image installs with npm ci --omit=dev (verified: no typescript, react or vite in the app image).
+- Engines stays >=22.19.0 (node:sqlite needs 22.13+).
+- Runner token wired in compose.yaml for both services (secret runner_token, file secrets/runner_token, gitignored).

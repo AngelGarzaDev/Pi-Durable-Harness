@@ -1,38 +1,30 @@
 {
   "name": "pi-durable-web",
   "version": "1.0.0",
-  "description": "Browser UI for Pi Durable",
-  "main": "index.js",
+  "description": "Single-user browser chat for Claude, built on Pi Durable, with a sandboxed tool runner",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json && vite build",
+    "start": "node --import tsx src/server.ts",
+    "start:runner": "node --import tsx runner/server.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/server.js",
     "test": "node --import tsx --test tests/*.test.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@earendil-works/chord": "^1.6.0",
     "@earendil-works/pi-ai": "^1.6.0",
     "@earendil-works/pi-durable": "^1.6.0",
+    "tsx": "^4.23.15",
     "ws": "^8.23.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.8"
-  },
-  "private": true,
-  "engines": {
-    "node": ">=22.19.0"
+    "typescript": "^7.0.2"
   }
 }

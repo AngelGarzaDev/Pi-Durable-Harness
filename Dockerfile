@@ -1,9 +1,10 @@
 # Two images from one build stage. Neither image contains the API key; the key is mounted only into `app`.
-# Runtime uses tsx (TypeScript run-time loader) because the source uses ".js" import specifiers.
+# Runtime uses tsx (TypeScript run-time loader, a runtime dependency) because the source uses ".js" import specifiers.
+# Production images install without devDependencies (no typescript, no test tools).
 FROM node:24-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Holds the Anthropic credential; runs the harness and the web UI. No shell tools.
 FROM deps AS app
