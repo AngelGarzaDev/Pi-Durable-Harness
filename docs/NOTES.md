@@ -56,3 +56,10 @@
 - tsx moved to dependencies because the production images run the TypeScript source directly. Production image installs with npm ci --omit=dev (verified: no typescript, react or vite in the app image).
 - Engines stays >=22.19.0 (node:sqlite needs 22.13+).
 - Runner token wired in compose.yaml for both services (secret runner_token, file secrets/runner_token, gitignored).
+
+## 2026-11-22 Goal 4.5-4.6: public release hygiene and verification
+- History rewritten (git 2.56 has no filter-branch; used git fast-export | python rewrite | fast-import). Replaced host paths, LAN IPs, the host name and the host user name; author now "pi-durable-web contributor <contributor@example.invalid>". Commit hashes changed. Verified: no hits for /var/home, htpc, 192.168, angel in history or tree; no hits for the value of any secret file. The old repo was kept at /tmp/durable-web-orig-git-backup (outside the repo) until the user agrees; delete it then.
+- Deploy surprise: the runner (uid 10001) could not read secrets/runner_token (EACCES), because the file was mode 600 and owned by the host user. Also SELinux was Enforcing and the file under /var/home had label user_home_t. Fix: chmod 644 plus chcon -t container_file_t. The README quick start now says so. The token is random and shared with only this stack, so 644 is an accepted trade-off.
+- Verified after deploy: docker compose up -d --build; runner healthy; curl http://127.0.0.1:8787/healthz returns ok; runner logs "runner listening on 0.0.0.0:7000, workspace /workspace".
+- Test suite on the rewritten history: npm run typecheck clean, npm test 51 pass.
+- Public release assets: LICENSE (AGPL-3.0), README.md (quick start), SECURITY.md (accepted risks), docs/DESIGN.md (was root PLAN.md), docs/REVIEW-2026-11-22.md (security review that drove goal 4).

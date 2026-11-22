@@ -25,5 +25,5 @@ Source: independent read-only review (findings numbered as in that review; full 
 - [x] 4.2 Runner hardening: shared bearer token file for app->runner (F2), reject non-string paths (F4), dangling-symlink check via lstat (F3), body cap (F16), Object.hasOwn on methods (F17), guard in runner/guard.ts with tests. remote-env sends the token and a 30 s timeout (F19).
 - [x] 4.3 Process: unhandled rejection logging and close-handler catch (F7), graceful shutdown with client close and timeout (F18), paginate chat list and applyToAll past 200 (F10).
 - [x] 4.4 Packaging: prod-only install in Docker (F20), drop unused React/Vite, tsx as runtime dep, license field AGPL-3.0-or-later, fix `start` script, compose runner_token secret.
-- [ ] 4.5 Repo hygiene: sanitize host paths/IPs/hostnames from docs and scripts, move root PLAN.md to docs/DESIGN.md, rewrite git author on history, scan full history for secrets, README (quick start, unsafe defaults noted), SECURITY.md, .gitignore.
-- [ ] 4.6 Verify: typecheck, npm test, docker compose up --build, healthz, curl login and WS smoke, no secrets in `git ls-files` or history.
+- [x] 4.5 Repo hygiene: sanitize host paths/IPs/hostnames from docs and scripts, move root PLAN.md to docs/DESIGN.md, rewrite git author on history, scan full history for secrets, README (quick start, unsafe defaults noted), SECURITY.md, .gitignore.
+- [x] 4.6 Verify: typecheck, npm test, docker compose up --build, healthz, curl login and WS smoke, no secrets in `git ls-files` or history.

@@ -35,6 +35,10 @@ openssl rand -hex 32 > secrets/app_token
 openssl rand -hex 32 > secrets/runner_token
 
 chmod 600 secrets/*
+# The runner runs as a different user (uid 10001) and must read runner_token.
+chmod 644 secrets/runner_token
+# On SELinux hosts (Fedora, Bazzite, RHEL) also label it for containers; harmless elsewhere when it fails:
+chcon -t container_file_t secrets/runner_token 2>/dev/null || true
 
 # 4. Build and start
 docker compose up -d --build

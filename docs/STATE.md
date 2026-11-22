@@ -1,24 +1,26 @@
-# STATE
+# STATE (handoff)
 
 ## Summary
-All three mission goals are done: turn-limit notice (goal 1), steer timing (goal 2), answer review (goal 3).
-Review now has a per-chat reviewer model (default: the chat's model) and stores its settings in settings.json.
-Deployed (`docker compose up -d --build`), healthz ok.
+pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner. Goals 1-3 (turn-limit notice, steer timing, answer review with per-chat reviewer model) are done. Goal 4 (public GitHub release and production hardening, request m00307) is done: app and runner hardening, process robustness, packaging, public docs, history scrubbed, deployed and healthy.
 
 ## Current task
-None. Review gaps closed and committed (17fe67a). Live check scripts saved under scripts/ (they hit the running app; not part of npm test).
+None open in the mission. Everything is committed (HEAD: see `git log`).
 
 ## How to run and test
-- Live checks (paid, haiku/sonnet only): `node scripts/live-chat-review.mjs` (chat + review on, needs app on 127.0.0.1:8787)
-- `npm run typecheck && npm test` (23 tests pass)
-- Deploy: `docker compose up -d --build`; check `curl -s http://127.0.0.1:8787/healthz`
+- Tests and types: `npm run typecheck && npm test` (51 tests).
+- Deploy: `docker compose up -d --build`, then `curl -s http://127.0.0.1:8787/healthz` (prints ok).
+- Live model calls cost money: scripts/live-review-checks.mjs and scripts/live-chat-review.mjs. Use claude-haiku-5-5 only (limit 100000) unless the user approves more.
 
-## Known issues
-- Haiku reviewer missed 17×23=400 earlier. Sonnet reviewer catches it (NOTES 2026-11-22).
-- Review parser fixed for replies that put PASS on the last line.
+## Known failures and limits (accepted, see SECURITY.md)
+- Sessions never expire and logout does not revoke the cookie (review F5).
+- Runner has no internet by default; compose.internet.yaml allows egress; runner shell can read the workspace only.
+- Earlier test chats (and their workspace files) remain in app-data; not deleted without user approval.
 
 ## Needs you
-- Test chats in the app data volume (chat ids include 400, 414, and older ones). Not deleted: no safe delete path. Say if you want them removed.
+- The old unscrubbed git history is kept at /tmp/durable-web-orig-git-backup. Delete it when you are satisfied with the new history.
+- Choose the public GitHub remote and push (no push done; no remote configured).
+- Decide whether to keep the runner_token mode 644 + container_file_t label trade-off (documented in README).
 
-## Done this session
-- Workspace test files deleted (15 files, approved).
+## Next steps
+1. Push to the public GitHub repo when the user provides a remote.
+2. Optional: review docs/REVIEW-2026-11-22.md for items not yet fixed (F5 sessions, F6 Secure flag default, F23 runner egress design).
