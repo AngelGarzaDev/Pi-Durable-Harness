@@ -61,3 +61,7 @@ Never `down -v`.
 
 ## Change log
 - 2026-11-22: production created on port 8790, from commit 2d95ba3 (ask_user feature included). Login verified (correct token 200, wrong 401). Model claude-haiku-5-5.
+
+## Browser-entered key and MCP servers (not yet on production)
+- Anthropic key: a key saved in the browser is stored in the app-data volume at credentials.json (mode 600, plaintext). It wins over the Docker secret. Decision and reasoning in docs/NOTES.md (goal 7).
+- MCP servers: DATA_DIR/mcp.json in the app-data volume. Local programs run inside the runner (no credentials). Production is still on fb098e2 and does not have these changes until the user asks for a deploy.

@@ -5,7 +5,7 @@
 ## Summary
 pi-durable-web: browser chat for Claude on Pi Durable, with a sandboxed runner.
 - Goals 1-7 done. Goal 5.2 blocked (needs second account).
-- Goal 7 (browser-entered Anthropic key): committed df8868a, deployed to dev.
+- Goal 7 (browser-entered Anthropic key): committed df8868a, deployed to dev. Docs done (7.4).
 - Goal 8 (MCP servers, Pi-style, @earendil-works/pi-mcp 1.6.0 pinned):
   - 8.1 config loader (src/mcp-config.ts) and 8.2 runner stdio servers (runner/mcp.ts) committed 3204004.
   - 8.3 app side (src/mcp.ts McpManager, wired in src/harness.ts) committed cd475eb. Suite 74 passing.
