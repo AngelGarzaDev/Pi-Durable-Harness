@@ -88,7 +88,8 @@ button:hover { background: #3a4150; }
       <input id="mcpname" placeholder="name (letters, digits, - _)" size="18" autocomplete="off">
       <input id="mcptarget" placeholder="https://… (remote) or program, e.g. node" size="30" autocomplete="off">
       <input id="mcpargs" placeholder="arguments (program only, space-separated)" size="26" autocomplete="off">
-      <button type="submit" title="Local programs run inside the runner, which has no credentials. Remote URLs are reached from the app.">Add server</button>
+      <button type="submit" id="mcpsubmit" title="Local programs run inside the runner, which has no credentials. Remote URLs are reached from the app.">Add server</button>
+      <button type="button" id="mcpcancel" hidden>Cancel edit</button>
       <span id="mcpmsg"></span>
     </form>
   </details>

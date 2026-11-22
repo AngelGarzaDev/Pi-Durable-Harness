@@ -167,3 +167,10 @@
 ## 2026-11-22 app access to the LAN subnet (user m00898)
 - Checked from the app container: already reachable without any change. 192.168.1.x answers on 22/80/443/445 for .1, .2, .10, .20, .30 (other .x silent). 192.168.10.10 and 192.168.20.30 also reachable.
 - No config change made. Could not inspect or change host firewall (iptables needs root; no sudo). Runner remains isolated (see network note above).
+
+## 2026-11-22 edit an MCP server (user m00912)
+- WS: new mcp-update {name, config}. Refused with "No server named" unless the name is in mcp.json; otherwise mcp.add(name, config, true) (replace) which stops and restarts the server. Name cannot be changed (rename = remove + add).
+- mcp reply now includes configs: {name: config} from mcp.json so the browser can pre-fill the form. Includes headers and env (the user's own values, same single-user trust as the rest of mcp.json).
+- UI: Edit button per row fills the form; Save changes sends mcp-update, Cancel edit clears. Editing keeps headers/env and other fields; only url/command/args come from the form.
+- Test: tests/mcp-ws.test.ts "mcp-update replaces..." (suite 80 passing).
+- Not yet clicked in a real browser.

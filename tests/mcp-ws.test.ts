@@ -1,5 +1,5 @@
 // WebSocket MCP messages end to end: the real app server (child process) plus an in-process Streamable HTTP MCP
-// fixture. Checks list, add (duplicate and invalid refused), reconnect, and remove, and that tools reach the list.
+// fixture. Checks list, add (duplicate and invalid refused), update, reconnect, and remove, and that tools reach the list.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -101,6 +101,16 @@ test("mcp-add refuses a duplicate name and an entry with both command and url", 
 test("mcp-reconnect restarts a server and keeps it ready", async () => {
 	const reply = await ask({ type: "mcp-reconnect", name: "pong" }, "mcp");
 	assert.equal(reply.servers.find((s: any) => s.name === "pong").state, "ready");
+});
+
+test("mcp-update replaces a server's config and reconnects it; an unknown name is refused", async () => {
+	const reply = await ask({ type: "mcp-update", name: "pong", config: { url: fixtureUrl, headers: { "x-test": "1" } } }, "mcp");
+	const pong = reply.servers.find((s: any) => s.name === "pong");
+	assert.equal(pong.state, "ready", pong.error);
+	assert.equal(reply.configs.pong.url, fixtureUrl);
+	assert.deepEqual(reply.configs.pong.headers, { "x-test": "1" });
+	const missing = await ask({ type: "mcp-update", name: "nope", config: { url: fixtureUrl } }, "error");
+	assert.match(String(missing.message), /No server named/);
 });
 
 test("mcp-remove takes the server away; removing again is refused", async () => {

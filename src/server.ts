@@ -35,6 +35,7 @@ type ClientMessage =
 	// MCP servers (goal 8). mcp-add takes one entry in Pi's mcpServers shape; a name already in use is refused.
 	| { type: "mcp-list" }
 	| { type: "mcp-add"; name: string; config: Record<string, unknown> }
+	| { type: "mcp-update"; name: string; config: Record<string, unknown> }
 	| { type: "mcp-remove"; name: string }
 	| { type: "mcp-reconnect"; name: string };
 
@@ -298,12 +299,14 @@ wss.on("connection", async (socket: WebSocket) => {
 				send({ type: "auth", anthropic: await anthropicStatus(credentials, secretKey) });
 			} else if (msg.type === "mcp-list") {
 				send(mcpReply());
-			} else if (msg.type === "mcp-add" || msg.type === "mcp-remove" || msg.type === "mcp-reconnect") {
+			} else if (msg.type === "mcp-add" || msg.type === "mcp-update" || msg.type === "mcp-remove" || msg.type === "mcp-reconnect") {
 				const name = typeof msg.name === "string" ? msg.name : "";
 				let problem: string | undefined;
-				if (msg.type === "mcp-add") {
+				if (msg.type === "mcp-add" || msg.type === "mcp-update") {
 					if (typeof msg.config !== "object" || msg.config === null || Array.isArray(msg.config)) problem = "config must be an object";
-					else problem = await mcp.add(name, msg.config);
+					else if (msg.type === "mcp-add") problem = await mcp.add(name, msg.config);
+					else if (!readMcpConfig(mcpPath).entries.some((e) => e.name === name)) problem = `No server named "${name}".`;
+					else problem = await mcp.add(name, msg.config, true);
 				} else if (msg.type === "mcp-remove") problem = await mcp.remove(name);
 				else problem = await mcp.reconnect(name);
 				if (problem) return send({ type: "error", message: problem });
@@ -333,8 +336,13 @@ server.listen(config.port, config.host, () => {
 process.on("unhandledRejection", (reason) => console.error("unhandled rejection:", reason));
 
 // Server list for the browser: live status plus the problems in mcp.json as it is now.
+const mcpPath = join(config.dataDir, "mcp.json");
+
 function mcpReply() {
-	return { type: "mcp", servers: mcp.list(), configErrors: readMcpConfig(join(config.dataDir, "mcp.json")).errors };
+	const { entries, errors } = readMcpConfig(mcpPath);
+	// configs lets the browser pre-fill the edit form. It includes headers and env, which are the user's own values.
+	const configs = Object.fromEntries(entries.map((e) => [e.name, e.config]));
+	return { type: "mcp", servers: mcp.list(), configs, configErrors: errors };
 }
 
 // Shutdown: stop accepting connections, close open sockets, then close the harness. Forced exit after 10 s.

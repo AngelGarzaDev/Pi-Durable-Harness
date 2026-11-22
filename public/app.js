@@ -278,7 +278,27 @@ keyClear.onclick = () => {
 const mcpList = document.getElementById("mcplist");
 const mcpErrors = document.getElementById("mcperrors");
 const mcpMsg = document.getElementById("mcpmsg");
+let mcpConfigs = {};
+let mcpEditing = null; // name of the server being edited, or null when adding
+function setMcpEditing(name) {
+	mcpEditing = name;
+	document.getElementById("mcpname").readOnly = !!name;
+	document.getElementById("mcpsubmit").textContent = name ? "Save changes" : "Add server";
+	document.getElementById("mcpcancel").hidden = !name;
+	if (!name) for (const id of ["mcpname", "mcptarget", "mcpargs"]) document.getElementById(id).value = "";
+}
+document.getElementById("mcpcancel").onclick = () => { setMcpEditing(null); mcpMsg.textContent = ""; };
+function editMcp(name) {
+	const cfg = mcpConfigs[name] ?? {};
+	setMcpEditing(name);
+	document.getElementById("mcpname").value = name;
+	document.getElementById("mcptarget").value = cfg.url ?? cfg.command ?? "";
+	document.getElementById("mcpargs").value = Array.isArray(cfg.args) ? cfg.args.join(" ") : "";
+	mcpMsg.textContent = "Editing. Headers and env are kept as they are.";
+	document.getElementById("mcptarget").focus();
+}
 function showMcp(info) {
+	mcpConfigs = info.configs ?? {};
 	document.getElementById("mcpcount").textContent = info.servers.length ? `(${info.servers.length})` : "";
 	mcpList.replaceChildren();
 	for (const s of info.servers) {
@@ -288,6 +308,10 @@ function showMcp(info) {
 		const state = document.createElement("span");
 		state.className = "state-" + s.state;
 		state.textContent = s.state + (s.error ? `: ${s.error}` : "");
+		const edit = document.createElement("button");
+		edit.type = "button";
+		edit.textContent = "Edit";
+		edit.onclick = () => editMcp(s.name);
 		const reconnect = document.createElement("button");
 		reconnect.type = "button";
 		reconnect.textContent = "Reconnect";
@@ -298,7 +322,7 @@ function showMcp(info) {
 		remove.onclick = () => {
 			if (confirm(`Remove MCP server "${s.name}"?`)) ws.send(JSON.stringify({ type: "mcp-remove", name: s.name }));
 		};
-		li.append(text, state, reconnect, remove);
+		li.append(text, state, edit, reconnect, remove);
 		mcpList.appendChild(li);
 	}
 	if (!info.servers.length) mcpList.textContent = "No servers yet.";
@@ -311,12 +335,15 @@ document.getElementById("mcpform").onsubmit = (e) => {
 	const target = document.getElementById("mcptarget").value.trim();
 	const args = document.getElementById("mcpargs").value.trim();
 	if (!name || !target) return (mcpMsg.textContent = "Enter a name and a URL or program.");
-	const config = /^https?:\/\//.test(target)
-		? { url: target }
-		: { command: target, ...(args ? { args: args.split(/\s+/) } : {}) };
-	mcpMsg.textContent = "Connecting…";
-	ws.send(JSON.stringify({ type: "mcp-add", name, config }));
-	document.getElementById("mcpname").value = "";
-	document.getElementById("mcptarget").value = "";
-	document.getElementById("mcpargs").value = "";
+	const isUrl = /^https?:\/\//.test(target);
+	// When editing, keep the other fields (headers, env, flags) and replace only the target and arguments.
+	const base = mcpEditing ? { ...(mcpConfigs[mcpEditing] ?? {}) } : {};
+	delete base.url; delete base.command; delete base.args;
+	const config = isUrl
+		? { ...base, url: target }
+		: { ...base, command: target, ...(args ? { args: args.split(/\s+/) } : {}) };
+	mcpMsg.textContent = mcpEditing ? "Saving…" : "Connecting…";
+	ws.send(JSON.stringify({ type: mcpEditing ? "mcp-update" : "mcp-add", name, config }));
+	if (mcpEditing) setMcpEditing(null);
+	else for (const id of ["mcpname", "mcptarget", "mcpargs"]) document.getElementById(id).value = "";
 };
