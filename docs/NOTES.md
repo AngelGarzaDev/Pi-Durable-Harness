@@ -86,3 +86,8 @@
 - Server checks that the question is open in the chat on that socket before calling `harness.signal`, so a client cannot answer another chat's question. Pi Durable itself checks nothing about senders.
 - Answer limit 2000 characters, options max 6 of 200 characters, question 1000 characters (src/ask.ts constants).
 - Tests: tests/ask.test.ts uses the faux provider from @earendil-works/pi-ai (no paid call). Suite: 56 tests pass.
+
+## 2026-11-22 live check and deploy (goal 6.4, 6.5)
+- Live check, claude-haiku-5-5, context limit 100000 (default). Script /tmp/livecheck/run.mjs (outside repo, not committed): logs in with the app token read from file (not printed), opens WS, sends new + submit asking for a two-option colour question, clicks "Red", waits for final reply. Result: question seen with options ["Red","Blue"]; answer-result ok; model replied "You chose Red.". Cost: 3 runs of about 3 calls each, well under $0.05.
+- One early run waited for a reply that did not match the detection rule (the detection was too loose), so it was re-run with a fixed rule; the re-run passed. Browser UI itself was not clicked (no browser login without putting the token in a tool call); the card HTML/JS was checked with node --check and the WS path was tested live.
+- `docker compose up -d --build` ok; app healthy; `curl -s http://127.0.0.1:8787/healthz` returns ok.

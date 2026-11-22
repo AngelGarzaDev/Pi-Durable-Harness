@@ -37,5 +37,5 @@ User request: the harness presents a question; the user clicks an answer or type
 - [x] 6.1 `ask_user` tool (src/ask.ts): parks on the `app.answer` signal, keyed by a memoized id; answer or timeout (24 h) on wake. Tests in tests/ask.test.ts (end to end with the faux provider: park, deliver, model gets answer, second delivery refused).
 - [x] 6.2 Server: pendingQuestions() in every view; WS `answer` message checked against the open chat's questions, then harness.signal; `answer-result` reply. Test in tests/http.test.ts.
 - [x] 6.3 Browser: question cards above the transcript (option buttons, own-answer field, Enter to send), public/ask-view.js helpers.
-- [ ] 6.4 Live check with claude-haiku-5-5 at 100000 tokens (one question, click an option). Log cost in NOTES.md.
-- [ ] 6.5 Deploy: docker compose up -d --build, healthz ok.
+- [x] 6.4 Live check with claude-haiku-5-5 at 100000 tokens (one question, click an option). Log cost in NOTES.md. Done via a WS script (not the browser UI): question seen, option Red sent, answer-result ok, model replied "You chose Red.". Three runs, about 3 short haiku calls each.
+- [x] 6.5 Deploy: docker compose up -d --build, healthz ok.
