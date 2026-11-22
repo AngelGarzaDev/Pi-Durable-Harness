@@ -23,3 +23,4 @@
 - Live test (chat haiku, reviewer sonnet): chat 414, neutral question "What is 17 times 23?" -> answer 391, review entry PASS with reviewer claude-sonnet-5-5. Cost well under $0.01.
 - Lesson: an earlier arithmetic test asked the chat to give a deliberately wrong answer. The reviewer correctly judged that as matching the request, so the test proved nothing. Test the reviewer with a neutral question and a wrong answer.
 - Test chats created for these checks: 400 and 414 (review on). Not deleted (no delete path; user to decide).
+- Live-check scripts saved to durable-web/scripts/: live-chat-review.mjs (WebSocket chat check) and live-review-checks.mjs (haiku review checks, earlier run). Both need the running app and secrets/ on disk; not run by npm test.
