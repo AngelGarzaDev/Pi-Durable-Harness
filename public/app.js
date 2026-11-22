@@ -2,6 +2,7 @@
 import { reviewLine, isReviewContinuation } from "./review-view.js";
 import { answerMessage, questionHint } from "./ask-view.js";
 import { renderMarkdown, enhanceCode } from "./markdown-view.js";
+import { orderChats } from "./chat-order.js";
 const ws = new WebSocket(`ws://${location.host}/ws`);
 const out = document.getElementById("transcript");
 const status = document.getElementById("status");
@@ -137,11 +138,7 @@ function render(entries) {
 
 function renderChats(chats) {
 	chatList.textContent = "";
-	const byId = new Map(chats.map((c) => [c.id, c]));
-	const ordered = [];
-	for (const c of chats) if (!c.parentId || !byId.has(c.parentId)) ordered.push([c, false]);
-	for (const c of chats) if (c.parentId && byId.has(c.parentId)) ordered.push([c, true]);
-	for (const [c, child] of ordered) {
+	for (const [c, child] of orderChats(chats)) {
 		const b = document.createElement("button");
 		b.className = "chat" + (child ? " child" : "") + (c.id === openId ? " active" : "");
 		b.textContent = (child ? "↳ " : "") + c.title;
