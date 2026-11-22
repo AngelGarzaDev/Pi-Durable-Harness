@@ -189,3 +189,4 @@
 ## 2026-11-22 UI restyle (user m00946, "modern intuitive design language")
 - Only CSS changed in public/index.html (same DOM and IDs, app.js untouched). Dark slate tokens, accent #7aa2f7, centred 46rem transcript, right-aligned user bubbles, primary Send, sidebar with active marker, mobile layout under 760px.
 - Checked in a static harness (copy of the page styles with sample transcript, python http.server on 127.0.0.1:8999, not the live app: the live page needs the token, which is not put in tool calls). Live browser check still to do.
+- 2026-11-22 chat bubbles (user m01081): your messages are right-aligned bubbles, Claude's are left-aligned bubbles (same width rules, role label hidden). Tool lines and reviews stay full width. CSS only. Checked in the static harness.
