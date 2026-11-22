@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync, realpathSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { bearerMatches, insideRoot } from "./guard.js";
+import { callTool, listTools, startServer, stopServer, stopAll } from "./mcp.js";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import { ExecutionError, FileError, type BinaryReader, type Result } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
@@ -158,6 +159,34 @@ async function handleExec(body: { command: string | string[]; options?: Record<s
 	void req;
 }
 
+// MCP stdio servers. Errors are returned as {ok:false, error:{message}} so the app can show them.
+async function handleMcp(op: string, body: any): Promise<unknown> {
+	try {
+		if (op === "start") {
+			// A relative cwd is taken from the workspace root. Anything else must resolve inside the workspace.
+			const requested = body.cwd === undefined ? undefined : String(body.cwd).startsWith("/") ? String(body.cwd) : `${VIRTUAL_ROOT}/${body.cwd}`;
+			if (requested !== undefined && !insideWorkspace(requested)) return { ok: false, error: { message: "cwd is outside the workspace" } };
+			const { tools } = await startServer({ name: body.name, command: body.command, args: body.args, env: body.env, cwd: requested === undefined ? undefined : toHost(requested) }, ROOT);
+			return { ok: true, tools: tools.map((t) => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema })) };
+		}
+		if (op === "stop") {
+			await stopServer(String(body.name));
+			return { ok: true };
+		}
+		if (op === "tools") {
+			const tools = listTools(String(body.name));
+			if (!tools) return { ok: false, error: { message: "server is not running" } };
+			return { ok: true, tools: tools.map((t) => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema })) };
+		}
+		if (op === "call") {
+			return { ok: true, ...(await callTool(String(body.name), String(body.tool), body.arguments ?? {})) };
+		}
+		return { ok: false, error: { message: "unknown mcp operation" } };
+	} catch (error) {
+		return { ok: false, error: { message: error instanceof Error ? error.message : String(error) } };
+	}
+}
+
 createServer(async (req, res) => {
 	try {
 		const url = new URL(req.url ?? "/", "http://runner");
@@ -168,6 +197,7 @@ createServer(async (req, res) => {
 		if (url.pathname === "/v1/reader/open") return send(res, 200, await handleOpenReader(await readBody(req)));
 		if (url.pathname === "/v1/reader") return send(res, 200, await handleReaderOp(await readBody(req)));
 		if (url.pathname === "/v1/exec") return await handleExec(await readBody(req), req, res);
+		if (url.pathname.startsWith("/v1/mcp/")) return send(res, 200, await handleMcp(url.pathname.slice("/v1/mcp/".length), await readBody(req)));
 		return send(res, 404, { error: "not found" });
 	} catch (error) {
 		if (error instanceof Error && error.message === "body too large") {
@@ -181,3 +211,6 @@ createServer(async (req, res) => {
 		else res.end();
 	}
 }).listen(PORT, HOST, () => console.log(`runner listening on ${HOST}:${PORT}, workspace ${WORKSPACE}`));
+
+// Stop MCP servers (child processes) when the runner is asked to stop.
+for (const sig of ["SIGTERM", "SIGINT"] as const) process.on(sig, () => void stopAll().finally(() => process.exit(0)));

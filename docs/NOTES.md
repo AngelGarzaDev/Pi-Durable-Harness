@@ -105,3 +105,11 @@
 - Pinned @earendil-works/pi-mcp 1.6.0 exact (npm install --save-exact). Its config types and validateMcpServerConfig are used for each entry; app adds name rules and "exactly one of command or url" (Pi's validator alone accepts both).
 - Config file: DATA_DIR/mcp.json, Pi's mcpServers shape, mode 600, written atomically. src/mcp-config.ts; tests/mcp-config.test.ts (6 tests). Env values and headers are NOT expanded (no ${VAR} substitution yet); a decision for 8.3 since it touches secrets.
 - Surprise: npm install printed "install-scripts" warnings; no install scripts are needed by this package (deps: cross-spawn only).
+
+## 2026-11-22 goal 8.1–8.2: MCP config and runner stdio servers
+- Pinned @earendil-works/pi-mcp 1.6.0 (exact). Its validator accepts both command and url, so src/mcp-config.ts adds the exactly-one rule.
+- Config file: DATA_DIR/mcp.json, Pi's mcpServers shape, written with mode 600 via tmp file + rename.
+- Stdio servers run in the runner (runner/mcp.ts). Each child gets a minimal env (PATH, HOME, user env only) because StdioTransport merges process.env unless inheritEnv is false. Relative cwd resolves inside the workspace; outside is refused.
+- Risk to remember: anyone who can add a server can run its command inside the runner container (workspace volume only, no credentials). The runner has no secrets by design; keep it that way.
+- Test fixture: tests/fixtures/mcp-echo-server.mjs; tests/runner-mcp.test.ts (4 tests).
+- Bug found by test: a relative cwd was refused and then start reported "server is not running". Fixed: relative cwd is resolved against the workspace root.
