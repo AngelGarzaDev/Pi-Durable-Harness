@@ -1,6 +1,7 @@
 // Browser client: chat list, transcript, settings, and chat actions (send, steer, fork, reset, compact).
 import { reviewLine, isReviewContinuation } from "./review-view.js";
 import { answerMessage, questionHint } from "./ask-view.js";
+import { renderMarkdown, enhanceCode } from "./markdown-view.js";
 const ws = new WebSocket(`ws://${location.host}/ws`);
 const out = document.getElementById("transcript");
 const status = document.getElementById("status");
@@ -108,7 +109,16 @@ function render(entries) {
 		for (const it of items(e)) {
 			const div = document.createElement("div");
 			div.className = it.cls;
-			div.textContent = it.cls === "review" ? it.text : it.text ? `${it.label}: ${it.text}` : it.label;
+			if (it.cls === "assistant") {
+				const role = document.createElement("div");
+				role.className = "role";
+				role.textContent = it.label;
+				const body = document.createElement("div");
+				body.className = "md";
+				body.innerHTML = renderMarkdown(it.text);
+				enhanceCode(body);
+				div.append(role, body);
+			} else div.textContent = it.cls === "review" ? it.text : it.text ? `${it.label}: ${it.text}` : it.label;
 			out.appendChild(div);
 		}
 		if ((e.kind === "pi.user" || e.kind === "pi.assistant") && Array.isArray(e.model) && e.model.length) {

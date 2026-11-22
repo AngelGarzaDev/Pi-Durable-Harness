@@ -177,3 +177,11 @@
 
 ## 2026-11-22 production deploy a329be2 (user m00940)
 - Backup taken with the streaming method (bind mount not used). deploy.sh → healthy at 8790, .deployed-commit a329be2. Read-only WS checks only, no model call.
+
+## 2026-11-22 markdown rendering for assistant messages (user m00946)
+- Libraries pinned exact: marked 18.2.1, dompurify 3.5.0. Vendored copies in public/vendor/ (marked.esm.js, purify.es.mjs, license files) so the browser needs no CDN or build step. Served through the PUBLIC_FILES allowlist.
+- public/markdown-view.js: marked (gfm, breaks) → DOMPurify. Raw HTML stripped; <img> forbidden (an answer must not make the browser fetch arbitrary URLs); links get target=_blank rel=noopener noreferrer. Code blocks get a Copy button.
+- Server: .mjs was served as application/octet-stream (browsers refuse that for modules); added text/javascript for .mjs. Covered by tests/static-files.test.ts.
+- Verified in a real browser on a static harness (python http.server on 127.0.0.1:8999, copy of public/ files): headings, bold/italic, inline code, list, table, fenced code + Copy, quote, link. Injected onerror and javascript: href were removed; no script ran; no img after the forbid change.
+- Not verified on the live app page (no login in tool calls). User messages stay plain text (no markdown), by design.
+- Test-harness gotcha: a "</script>" inside a JS string in an inline <script> ends the tag early; escape as <\/script>.

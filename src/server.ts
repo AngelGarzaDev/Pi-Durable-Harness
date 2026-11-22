@@ -45,9 +45,9 @@ const { harness, root, models, settings: initialSettings, reviews, credentials, 
 let settings: ChatSettings = initialSettings;
 const titles: Titles = loadTitles(config.dataDir);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
-const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
+const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css" };
 // Only these files are served. Nothing else under public/ is reachable.
-const PUBLIC_FILES = new Set(["index.html", "login.html", "app.js", "login.js", "review-view.js", "ask-view.js"]);
+const PUBLIC_FILES = new Set(["index.html", "login.html", "app.js", "login.js", "review-view.js", "ask-view.js", "markdown-view.js", "vendor/marked.esm.js", "vendor/purify.es.mjs"]);
 
 // Only these are reachable without the session cookie: health check, login page and its script.
 const OPEN_PATHS = new Set(["/healthz", "/login", "/login.html", "/login.js"]);
