@@ -63,3 +63,10 @@
 - Verified after deploy: docker compose up -d --build; runner healthy; curl http://127.0.0.1:8787/healthz returns ok; runner logs "runner listening on 0.0.0.0:7000, workspace /workspace".
 - Test suite on the rewritten history: npm run typecheck clean, npm test 51 pass.
 - Public release assets: LICENSE (AGPL-3.0), README.md (quick start), SECURITY.md (accepted risks), docs/DESIGN.md (was root PLAN.md), docs/REVIEW-2026-11-22.md (security review that drove goal 4).
+
+## 2026-11-22 Container uid: run as the host user
+- Problem: containers ran as fixed uid 1000 (app) and 10001 (runner). A host user with another uid could not read secrets, and the runner needed a 644 secret plus an SELinux relabel. Other users would hit this.
+- Decision: pass the invoking user's uid/gid as build args (`APP_UID`/`APP_GID` from `.env`, written by `scripts/setup-secrets.sh`), so secrets stay mode 600 and owned by that user. Rejected: chmod 644 or ACLs (loosens secrets), and a fixed uid other than the host user (same problem).
+- Trade-off: runner shares the host uid. Documented in SECURITY.md.
+- Workspace volume was owned by 10001; chowned to 1000:1000 once (it was empty). README has the upgrade command.
+- Verified: `docker compose up -d --build` healthy, app uid 1000, runner uid 1000 writes to /workspace, healthz ok. Not verified with a second real host user (no second account available); the build-arg path was checked with `HOST_UID=4321 docker compose config` which showed APP_UID "4321".

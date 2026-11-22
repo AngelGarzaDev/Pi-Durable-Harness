@@ -19,7 +19,7 @@ None open in the mission. Everything is committed (HEAD: see `git log`).
 ## Needs you
 - The old unscrubbed git history is kept at /tmp/durable-web-orig-git-backup. Delete it when you are satisfied with the new history.
 - Choose the public GitHub remote and push (no push done; no remote configured).
-- Decide whether to keep the runner_token mode 644 + container_file_t label trade-off (documented in README).
+- Container uid now equals the host user (see SECURITY.md "Container user"); no 644 secret needed.
 
 ## Next steps
 1. Push to the public GitHub repo when the user provides a remote.

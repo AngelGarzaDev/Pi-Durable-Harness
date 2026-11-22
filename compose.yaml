@@ -3,9 +3,11 @@ name: pi-durable-web
 
 services:
   app:
-    build: { context: ., target: app }
+    build:
+      context: .
+      target: app
+      args: { APP_UID: "${HOST_UID:-1000}", APP_GID: "${HOST_GID:-1000}" }
     image: pi-durable-web-app:local
-    user: "1000:1000"
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -32,9 +34,11 @@ services:
       retries: 3
 
   runner:
-    build: { context: ., target: runner }
+    build:
+      context: .
+      target: runner
+      args: { APP_UID: "${HOST_UID:-1000}", APP_GID: "${HOST_GID:-1000}" }
     image: pi-durable-web-runner:local
-    user: "10001:10001"
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]

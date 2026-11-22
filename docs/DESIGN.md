@@ -128,7 +128,7 @@ Design: two containers, split by trust.
 - The harness uses a custom `ExecutionEnv` (pi-durable `env` option, see README "Environment") that forwards tool calls to the runner. So the agent's tools run in `runner`, and the token never enters `runner`'s memory, filesystem, or environment.
 
 Hardening for both containers:
-- Non-root: `user: 10001:10001` in compose, and `USER` in the Dockerfile. No `privileged`, no `--pid=host`, no `--network=host`.
+- Non-root: both containers run as the invoking host user's uid and gid (build args `APP_UID`/`APP_GID` from `.env`, written by `scripts/setup-secrets.sh`). The secrets stay mode 600 and owned by that user. Isolation between app and runner comes from separate containers, not from separate uids. No `privileged`, no `--pid=host`, no `--network=host`.
 - `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, read-only root filesystem (writable only `/tmp` and the volume it needs).
 - No docker socket, no host paths except the named volumes. The Docker group membership of the host user is root-equivalent on the host, so nothing mounts the socket.
 - Runner path checks: resolve every path and reject anything outside `/workspace` (symlink-aware).

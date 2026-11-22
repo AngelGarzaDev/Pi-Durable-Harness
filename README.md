@@ -23,27 +23,25 @@ your own machine. It serves plain HTTP on `127.0.0.1` only.
 
 ```sh
 git clone <this repo> pi-durable-web && cd pi-durable-web
-mkdir -p secrets
 
-# 1. Your Anthropic API key (must start with sk-ant-)
-printf '%s\n' 'sk-ant-...your key...' > secrets/anthropic_api_key
+# Creates secrets/ (mode 600, owned by you), asks for your Anthropic key (input hidden),
+# and writes .env with your uid/gid so the containers can read the secrets.
+./scripts/setup-secrets.sh
 
-# 2. A login token for the browser (32+ characters)
-openssl rand -hex 32 > secrets/app_token
-
-# 3. A shared secret between the app and the runner (32+ characters)
-openssl rand -hex 32 > secrets/runner_token
-
-chmod 600 secrets/*
-# The runner runs as a different user (uid 10001) and must read runner_token.
-chmod 644 secrets/runner_token
-# On SELinux hosts (Fedora, Bazzite, RHEL) also label it for containers; harmless elsewhere when it fails:
-chcon -t container_file_t secrets/runner_token 2>/dev/null || true
-
-# 4. Build and start
 docker compose up -d --build
 curl -s http://127.0.0.1:8787/healthz   # prints: ok
 ```
+
+Manual alternative (same result): `umask 077; mkdir -p secrets`, write the three files
+(`secrets/anthropic_api_key` starting with `sk-ant-`, `secrets/app_token` and `secrets/runner_token`
+from `openssl rand -hex 32`), `chmod 600 secrets/*`, and
+`printf 'HOST_UID=%s\nHOST_GID=%s\n' "$(id -u)" "$(id -g)" > .env`.
+The containers run as your uid and gid, so the files must be owned by you. Do not run the setup as root.
+
+Upgrading from an earlier version (which ran the runner as uid 10001): the `workspace` volume is still
+owned by 10001 and the runner cannot write to it. Fix once, keeping the files:
+`docker run --rm --user 0 --entrypoint sh -v pi-durable-web_workspace:/workspace pi-durable-web-runner:local -c 'chown -R 1000:1000 /workspace'`
+(replace 1000 with your uid if different). Then run `docker compose up -d --build`.
 
 Open <http://127.0.0.1:8787>, and sign in with the contents of `secrets/app_token`.
 

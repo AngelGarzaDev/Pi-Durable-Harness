@@ -35,3 +35,11 @@ Open a private security advisory on the repository. Please do not post exploit
 details in a public issue before a fix is available.
 
 The review that led to the hardening in this release is in [docs/REVIEW-2026-11-22.md](docs/REVIEW-2026-11-22.md).
+
+## Container user
+Both containers run as the uid/gid of the account that ran `scripts/setup-secrets.sh` (from `.env`), not a fixed uid.
+This keeps the secret files mode 600 and owned by you. The runner therefore shares your uid, so a compromised runner
+has the same file access as you inside the workspace volume and the container. Its isolation comes from the container
+boundary (read-only root, no capabilities, no credentials, internal network), not from a separate uid.
+Do not run the setup as root.
+
