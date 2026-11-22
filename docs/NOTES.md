@@ -163,3 +163,7 @@
 - App container: reaches the LAN and internet. TCP open: 192.168.1.1:443, 192.168.1.30:22 (host sshd), 192.168.10.10:445 (SMB), 172.17.0.1:22. https://example.com returns 200.
 - Consequence: the app holds the Anthropic key and makes http MCP connections (StreamableHttpTransport), so an http MCP URL pointing at a LAN device is reachable. Model-driven tool calls run in the runner, which cannot reach the LAN.
 - Not changed. Options for the user: (a) put app on tools only and move the Anthropic call out of the LAN-capable network (app still needs internet for api.anthropic.com, so a proxy/allowlist is needed); (b) add an egress firewall rule (DOCKER-USER) to block 192.168.0.0/16, 10.0.0.0/8 and 172.16.0.0/12 from 172.23.0.0/16; (c) keep as is and accept it.
+
+## 2026-11-22 app access to the LAN subnet (user m00898)
+- Checked from the app container: already reachable without any change. 192.168.1.x answers on 22/80/443/445 for .1, .2, .10, .20, .30 (other .x silent). 192.168.10.10 and 192.168.20.30 also reachable.
+- No config change made. Could not inspect or change host firewall (iptables needs root; no sudo). Runner remains isolated (see network note above).
