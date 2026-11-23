@@ -31,6 +31,8 @@ button.linkish:hover { color: var(--text); background: none; }
 /* sidebar */
 #chats { width: 16rem; flex: 0 0 16rem; border-right: 1px solid var(--border); padding: 1rem .75rem; overflow-y: auto; background: var(--side); display: flex; flex-direction: column; gap: .4rem; }
 #chats h2 { font-size: .72rem; color: var(--muted); margin: .4rem .5rem .3rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+#newfolder { width: 100%; box-sizing: border-box; margin-bottom: .4rem; }
+#newmsg { font-size: .8rem; color: var(--muted); }
 #new { width: 100%; background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
 #new:hover:not(:disabled) { background: #8fb0fa; border-color: transparent; }
 #chatlist { display: flex; flex-direction: column; gap: 2px; margin-top: .5rem; }
@@ -143,7 +145,9 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
 </style>
 <aside id="chats">
   <h2>Chats</h2>
+  <input id="newfolder" type="text" maxlength="64" placeholder="Folder (optional)" title="Folder under /workspace for this chat. Fixed once the chat is created.">
   <button type="button" id="new">+ New chat</button>
+  <div id="newmsg" class="muted"></div>
   <div id="chatlist"></div>
 </aside>
 <div id="main">

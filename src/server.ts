@@ -9,9 +9,11 @@ import { loadConfig } from "./config.js";
 import { anthropicStatus, checkKeyFormat, clearAnthropicKey, setAnthropicKey } from "./credentials.js";
 import { SESSION_COOKIE, isAuthed, readAccessToken, sessionValue, tokenMatches } from "./auth.js";
 import { applySettings, context, listModels, modelInfo, openHarness } from "./harness.js";
+import { RemoteExecutionEnv } from "./tools/remote-env.js";
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
+import { WORKSPACE_ROOT, checkFolderName, folderPath, loadChatFolders, saveChatFolders, type ChatFolders } from "./chat-folder.js";
 import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
 import { readMcpConfig } from "./mcp-config.js";
 import { LoginLimiter, SECURITY_HEADERS, errorRef, originAllowed } from "./guard.js";
@@ -22,7 +24,7 @@ type ClientMessage =
 	| { type: "compact"; instructions?: string }
 	| { type: "reset"; handoff?: string }
 	| { type: "fork"; entryId: number }
-	| { type: "new" }
+	| { type: "new"; folder?: string }
 	| { type: "list" }
 	| { type: "open"; conversationId: number }
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
@@ -43,11 +45,12 @@ type ClientMessage =
 
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
-const { harness, root, models, settings: initialSettings, reviews, credentials, secretKey, mcp } = await openHarness(config);
+const { harness, root, models, settings: initialSettings, reviews, credentials, secretKey, mcp, runnerUrl, runnerToken } = await openHarness(config);
 let settings: ChatSettings = initialSettings;
 // The root chat is configured at startup without its own instructions, so apply them here if it has any.
 const titles: Titles = loadTitles(config.dataDir);
 const chatInstructions: ChatInstructions = loadChatInstructions(config.dataDir);
+const chatFolders: ChatFolders = loadChatFolders(config.dataDir);
 if (chatInstructions[String(root.id)]) await applySettings(root, models, settings, chatInstructions[String(root.id)]);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css" };
@@ -169,12 +172,23 @@ async function chatList(): Promise<{ type: "chats"; chats: { id: number; title: 
 	return { type: "chats", chats };
 }
 
+// Creates /workspace/<name> on the runner (mkdir -p). Returns false when the runner refuses or cannot be reached.
+async function makeFolder(name: string): Promise<boolean> {
+	try {
+		const env = new RemoteExecutionEnv(runnerUrl, runnerToken, WORKSPACE_ROOT);
+		const result = await env.exec(["mkdir", "-p", "--", name], { cwd: WORKSPACE_ROOT }, context);
+		return result.ok && result.value.exitCode === 0;
+	} catch {
+		return false;
+	}
+}
+
 // Applies the saved settings to every chat, so a model or limit change covers all of them.
 async function applyToAll(next: ChatSettings) {
 	const records = await allConversations();
 	for (const r of records) {
 		const conv = await harness.conversation(r.id, context);
-		if (conv) await applySettings(conv, models, next, chatInstructions[String(r.id)]);
+		if (conv) await applySettings(conv, models, next, chatInstructions[String(r.id)], chatFolders[String(r.id)] ? folderPath(chatFolders[String(r.id)]) : undefined);
 	}
 }
 
@@ -202,7 +216,7 @@ wss.on("connection", async (socket: WebSocket) => {
 			else send({ type: "error", message: publicError(call) });
 		});
 		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id), questions: pendingQuestions(watch.value.docs) });
-		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat"), instructions: chatInstructions[String(conv.id)] ?? "" });
+		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat"), instructions: chatInstructions[String(conv.id)] ?? "", folder: chatFolders[String(conv.id)] ?? "" });
 	};
 	try {
 		await openChat(root);
@@ -245,14 +259,29 @@ wss.on("connection", async (socket: WebSocket) => {
 					chatInstructions[String(fork.id)] = chatInstructions[String(active.id)];
 					saveChatInstructions(config.dataDir, chatInstructions);
 				}
-				await applySettings(fork, models, settings, chatInstructions[String(fork.id)]);
+				if (chatFolders[String(active.id)] !== undefined) {
+					chatFolders[String(fork.id)] = chatFolders[String(active.id)];
+					saveChatFolders(config.dataDir, chatFolders);
+				}
+				await applySettings(fork, models, settings, chatInstructions[String(fork.id)], chatFolders[String(fork.id)] ? folderPath(chatFolders[String(fork.id)]) : undefined);
 				await openChat(fork);
 				send(await chatList());
 			} else if (msg.type === "new") {
+				// Optional folder under /workspace: created on the runner first, so a failure leaves no chat behind.
+				const folder = typeof msg.folder === "string" ? msg.folder.trim() : "";
+				if (folder) {
+					const problem = checkFolderName(folder);
+					if (problem) return send({ type: "error", message: problem });
+					if (!(await makeFolder(folder))) return send({ type: "error", message: "Could not create that folder on the runner." });
+				}
 				const conv = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 				titles[String(conv.id)] = "Chat";
 				saveTitles(config.dataDir, titles);
-				await applySettings(conv, models, settings, chatInstructions[String(conv.id)]);
+				if (folder) {
+					chatFolders[String(conv.id)] = folder;
+					saveChatFolders(config.dataDir, chatFolders);
+				}
+				await applySettings(conv, models, settings, chatInstructions[String(conv.id)], folder ? folderPath(folder) : undefined);
 				await openChat(conv);
 				send(await chatList());
 			} else if (msg.type === "open") {

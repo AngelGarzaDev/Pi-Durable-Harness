@@ -176,11 +176,13 @@ ws.onmessage = (e) => {
 		titleEl.textContent = msg.title;
 		instrText.value = msg.instructions ?? "";
 		instrMsg.textContent = "";
-		status.textContent = "connected";
+		status.textContent = msg.folder ? "connected · folder " + msg.folder : "connected";
+		newMsg.textContent = "";
 		ws.send(JSON.stringify({ type: "list" }));
 	} else if (msg.type === "chats") renderChats(msg.chats);
 	else if (msg.type === "error") {
 		status.textContent = "error: " + msg.message;
+		newMsg.textContent = msg.message;
 		settingsMsg.textContent = msg.message;
 		keyMsg.textContent = msg.message;
 		mcpMsg.textContent = msg.message;
@@ -204,7 +206,13 @@ document.getElementById("f").onsubmit = (e) => {
 	send("followUp");
 };
 document.getElementById("steer").onclick = () => send("steer");
-document.getElementById("new").onclick = () => ws.send(JSON.stringify({ type: "new" }));
+const newFolder = document.getElementById("newfolder");
+const newMsg = document.getElementById("newmsg");
+document.getElementById("new").onclick = () => {
+	const folder = newFolder.value.trim();
+	newMsg.textContent = folder ? "Creating folder…" : "";
+	ws.send(JSON.stringify({ type: "new", folder }));
+};
 document.getElementById("logout").onclick = async () => {
 	await fetch("/logout", { method: "POST" });
 	location.href = "/login";

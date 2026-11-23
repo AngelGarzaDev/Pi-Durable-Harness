@@ -9,6 +9,7 @@ import { RemoteExecutionEnv } from "./tools/remote-env.js";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import type { Config } from "./config.js";
 import { composeInstructions } from "./chat-instructions.js";
+import { WORKSPACE_ROOT } from "./chat-folder.js";
 import { checkSettings, compactionFor, defaultSettings, loadSettings, type ChatSettings, type ModelInfo } from "./settings.js";
 import { readApiKey, readOptionalApiKey, readRunnerToken } from "./config.js";
 import { ReviewSettings, reviewExtension } from "./review.js";
@@ -57,7 +58,8 @@ export async function openHarness(config: Config) {
 	const harness = await Harness.open(storage, {
 		models,
 		registry,
-		env: () => new RemoteExecutionEnv(config.runnerUrl, runnerToken, "/workspace"),
+		// Each conversation runs its tools in its own folder (agent cwd); the default is the workspace root.
+		env: ({ cwd }) => new RemoteExecutionEnv(config.runnerUrl, runnerToken, cwd ?? WORKSPACE_ROOT),
 	}, context);
 	// Saved settings win over the env default. An unusable saved setting falls back to the default.
 	const saved = loadSettings(config.dataDir);
@@ -70,7 +72,7 @@ export async function openHarness(config: Config) {
 	});
 	await applySettings(root, models, settings);
 	harness.resume(); // continue any run the last process left unfinished
-	return { harness, root, models, settings, reviews, credentials, secretKey: secretKey !== undefined, mcp, mcpErrors };
+	return { harness, root, models, settings, reviews, credentials, secretKey: secretKey !== undefined, mcp, mcpErrors, runnerUrl: config.runnerUrl, runnerToken };
 }
 
 // Chat models the browser can pick, from the pi-ai catalog.
@@ -84,7 +86,7 @@ export function listModels(models: ReturnType<typeof createModels>): ModelInfo[]
 }
 
 // Pushes model, compaction and instructions to the conversation. Takes effect on the next request.
-export async function applySettings(conversation: Conversation, models: ReturnType<typeof createModels>, s: ChatSettings, chatInstructions?: string) {
+export async function applySettings(conversation: Conversation, models: ReturnType<typeof createModels>, s: ChatSettings, chatInstructions?: string, cwd?: string) {
 	const info = modelInfo(models, s.modelId);
 	if (!info) throw new Error(`Unknown model ${s.modelId}`);
 	await conversation.configure({
@@ -92,5 +94,6 @@ export async function applySettings(conversation: Conversation, models: ReturnTy
 		instructions: composeInstructions(chatInstructions),
 		compaction: compactionFor(s, info),
 		maxTurns: s.maxTurns,
+		...(cwd === undefined ? {} : { cwd }),
 	}, context);
 }
