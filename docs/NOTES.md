@@ -226,3 +226,4 @@
 - Tests: 108/108 (5 new WS/merge tests in chat-folder.test.ts).
 - Dev live check (no model call): folder with 2-line AGENTS.md, new chat, open message carried the block exactly. Test folder removed from the dev workspace afterwards.
 - Prod NOT redeployed for step 3 (AGENTS.md: prod changes need the user's request).
+- 2026-11-23 production deploy 0a61619 (user m01391, step 3). Backup deploy/production/backup/app-data-pre-step3-2026-11-23.tgz (98 KB, stream tar). deploy.sh healthy at 8790; healthz ok; read-only WS list answered (4 titled chats in chats.json, same titles as the backup). No chat created, no model call, no folder changed on prod.
