@@ -215,3 +215,4 @@
 - Live check on dev (haiku, default model, 2 short calls, roughly 1 cent): chat in folder "livecheck" ran `pwd` via bash and the reply contained /workspace/livecheck. Shows the cwd reaches the runner's tools.
 - Not done: step 3 (read AGENTS.md from the folder), browser click-through of the folder box.
 - 2026-11-23 production deploy f3fa285 (user m01213, steps 1+2): backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz (stream tar, 245 KB). deploy.sh healthy at 8790. Read-only WS check: 3 chats listed, Anthropic key source secret. No chat created on prod, no model call on prod.
+- 2026-11-23 push policy (user m01334): ../AGENTS.md now allows pushing to origin main after each tested step without asking (typecheck + test passing, docs committed). Only that remote, no force-push.
