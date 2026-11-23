@@ -1,7 +1,7 @@
 # STATE (handoff)
 
 ## Current task
-Settings pages (user m01522): GLOBAL settings dialog and one WORKSPACE settings dialog per folder. DONE in code and tests, on dev (rebuilt, healthz ok). Commit and push pending when this file is saved; then prod deploy (user m01536: "once testing is complete, push to prod").
+Settings pages (user m01522): DONE, on prod at 908b2df. Browser click-through still pending (user sign-in).
 
 ## Done recently
 - Settings: "Settings" button in #top opens #globaldlg (model/limit/max rounds, Anthropic key, MCP servers). Each folder row has a gear button (.folder-gear) that opens #wsdlg for /workspace/<folder>: workspace instructions, "Load AGENTS.md from folder".
@@ -11,8 +11,8 @@ Settings pages (user m01522): GLOBAL settings dialog and one WORKSPACE settings 
 - Earlier: per-chat instructions (step 1), per-chat folder (step 2), AGENTS.md copy (step 3), sidebar grouping, autofill off, "+" per folder.
 
 ## Next steps
-1. Commit + push origin main (AGENTS.md push recipe).
-2. Prod deploy: backup deploy/production/backup/app-data-pre-settings-<date>.tgz, deploy/production/deploy.sh, healthz on 127.0.0.1:8790.
+1. Done: pushed 908b2df; prod deployed 908b2df (backup app-data-pre-settings-2026-11-23.tgz).
+2. Done (see NOTES).
 3. Browser click-through of Settings dialog and gear dialog on dev and prod (needs user sign-in; not done by agent).
 
 ## How to test

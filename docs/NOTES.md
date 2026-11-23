@@ -263,3 +263,4 @@
 - Overlap: chat "Load AGENTS.md" (step 3) and workspace "Load AGENTS.md" both copy the same block. Each box keeps one copy, but a chat with both gets the file's text twice. Left as is; the chat box shows exactly what is sent.
 - workspace-get/save/load only accept a folder that some chat uses. Reason: avoids creating settings for arbitrary names; folder names are already checked by checkFolderName.
 - Test: tests/workspace-settings.test.ts (8: combine order, storage, limit, WS get/save/clear/too-long/load/no-file). Browser check not done by the agent (needs user sign-in; token not used in tool calls).
+- 2026-11-23 production deploy 908b2df (user m01536). Backup deploy/production/backup/app-data-pre-settings-2026-11-23.tgz (279 KB). deploy.sh healthy at 8790; healthz ok; prod serves the new index.html. No model call, no chat changed.
