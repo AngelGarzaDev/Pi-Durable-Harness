@@ -8,7 +8,7 @@ import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { RemoteExecutionEnv } from "./tools/remote-env.js";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import type { Config } from "./config.js";
-import { INSTRUCTIONS } from "./prompt.js";
+import { composeInstructions } from "./chat-instructions.js";
 import { checkSettings, compactionFor, defaultSettings, loadSettings, type ChatSettings, type ModelInfo } from "./settings.js";
 import { readApiKey, readOptionalApiKey, readRunnerToken } from "./config.js";
 import { ReviewSettings, reviewExtension } from "./review.js";
@@ -84,12 +84,12 @@ export function listModels(models: ReturnType<typeof createModels>): ModelInfo[]
 }
 
 // Pushes model, compaction and instructions to the conversation. Takes effect on the next request.
-export async function applySettings(conversation: Conversation, models: ReturnType<typeof createModels>, s: ChatSettings) {
+export async function applySettings(conversation: Conversation, models: ReturnType<typeof createModels>, s: ChatSettings, chatInstructions?: string) {
 	const info = modelInfo(models, s.modelId);
 	if (!info) throw new Error(`Unknown model ${s.modelId}`);
 	await conversation.configure({
 		model: { provider: "anthropic", modelId: s.modelId },
-		instructions: INSTRUCTIONS,
+		instructions: composeInstructions(chatInstructions),
 		compaction: compactionFor(s, info),
 		maxTurns: s.maxTurns,
 	}, context);

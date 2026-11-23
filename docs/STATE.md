@@ -1,26 +1,27 @@
 # STATE (handoff)
 
 ## Current task
-UI design work (user m00946): 1) markdown rendering — DONE (commit 55ef85e); 2) modern UI restyle — DONE (378521f, CSS only); 3) further polish — not started.
+Per-conversation workspace plan (user m01156/m01170). Step 1 DONE in working tree: per-chat "Chat instructions" (appended after base prompt, stored in chat-instructions.json). Steps 2 and 3 not started.
 
 ## Done recently
-- Goal 8 MCP servers complete (8.1–8.6), incl. edit server (a329be2). Production on a329be2.
-- Markdown: public/markdown-view.js (marked 18.2.1 + DOMPurify 3.5.0, vendored in public/vendor/, img tags forbidden).
-- Restyle: public/index.html <style> only.
-- Push: origin main at 378521f (via temp GIT_ASKPASS script reading secrets/github_repo_api_key; recipe in /var/home/angel/Pi/host/AGENTS.md).
+- Step 1 per-chat instructions: src/chat-instructions.ts, src/harness.ts applySettings(..., chatInstructions), src/server.ts chat-instructions message, public/index.html #instr box, public/app.js. Tests 95/95.
+- UI: markdown (55ef85e), restyle (378521f), chat list newest first (5185cc3), questions above composer (0cd84e0).
+- Goal 8 MCP servers complete. Production on 5185cc3 (last redeploy); prod has NOT got step 1 yet.
 
 ## Next steps
-1. Live browser check on dev (http://127.0.0.1:8787): sign in with the token ONLY inside the browser (do not put it in tool calls), check markdown, restyle, goal 6 question card, goal 7 key row, goal 8 MCP panel + Edit.
-2. Optional polish: settings bar grouping, composer states, empty-state.
-3. Production redeploy (deploy/production/deploy.sh) only when user asks; back up app-data first.
+1. Browser check of the chat instructions box on dev (sign in in the browser only; never put the token in tool calls).
+2. Step 2: per-chat folder under /workspace (new chat asks for folder; runner guard allows subfolders; RemoteExecutionEnv cwd per conversation).
+3. Step 3: read AGENTS.md from the chat's folder via the runner, add to that chat's instructions.
+4. Life-manager prompt: waiting on user (what to manage, m01158).
 
 ## How to test
-- npm run typecheck && npm test (83 passing).
+- npm run typecheck && npm test (95 passing).
 - Dev: docker compose up -d --build; curl -s http://127.0.0.1:8787/healthz → ok.
 
 ## Known gaps
-- Browser click-through not done for goal 6/7/8 UI or the new restyle (only static harness and WS tests).
+- Browser click-through not done for goal 6/7/8 UI, restyle, chat order, or the new instructions box.
 - Goal 5.2 blocked (second account).
 
 ## Needs you
 - Test chats/files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt, /workspace/mcp-live) — do not delete without approval.
+- Production redeploy for step 1 only when you ask (back up app-data first).

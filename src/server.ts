@@ -12,6 +12,7 @@ import { applySettings, context, listModels, modelInfo, openHarness } from "./ha
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
+import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
 import { readMcpConfig } from "./mcp-config.js";
 import { LoginLimiter, SECURITY_HEADERS, errorRef, originAllowed } from "./guard.js";
 
@@ -25,6 +26,7 @@ type ClientMessage =
 	| { type: "list" }
 	| { type: "open"; conversationId: number }
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
+	| { type: "chat-instructions"; text: string }
 	| { type: "review"; on?: boolean; reviewerModel?: string }
 	// An answer to a question the model asked (ask_user). taskId and key must match a question shown in the open chat.
 	| { type: "answer"; taskId: number; key: string; text: string }
@@ -43,7 +45,10 @@ const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
 const { harness, root, models, settings: initialSettings, reviews, credentials, secretKey, mcp } = await openHarness(config);
 let settings: ChatSettings = initialSettings;
+// The root chat is configured at startup without its own instructions, so apply them here if it has any.
 const titles: Titles = loadTitles(config.dataDir);
+const chatInstructions: ChatInstructions = loadChatInstructions(config.dataDir);
+if (chatInstructions[String(root.id)]) await applySettings(root, models, settings, chatInstructions[String(root.id)]);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css" };
 // Only these files are served. Nothing else under public/ is reachable.
@@ -169,7 +174,7 @@ async function applyToAll(next: ChatSettings) {
 	const records = await allConversations();
 	for (const r of records) {
 		const conv = await harness.conversation(r.id, context);
-		if (conv) await applySettings(conv, models, next);
+		if (conv) await applySettings(conv, models, next, chatInstructions[String(r.id)]);
 	}
 }
 
@@ -197,7 +202,7 @@ wss.on("connection", async (socket: WebSocket) => {
 			else send({ type: "error", message: publicError(call) });
 		});
 		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id), questions: pendingQuestions(watch.value.docs) });
-		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat") });
+		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat"), instructions: chatInstructions[String(conv.id)] ?? "" });
 	};
 	try {
 		await openChat(root);
@@ -236,14 +241,18 @@ wss.on("connection", async (socket: WebSocket) => {
 				const fork = await active.fork(msg.entryId as unknown as EntryId, { ownership: { kind: "ownerless" } }, context);
 				titles[String(fork.id)] = `Branch of ${titles[String(active.id)] ?? "Main chat"}`.slice(0, 80);
 				saveTitles(config.dataDir, titles);
-				await applySettings(fork, models, settings);
+				if (chatInstructions[String(active.id)] !== undefined) {
+					chatInstructions[String(fork.id)] = chatInstructions[String(active.id)];
+					saveChatInstructions(config.dataDir, chatInstructions);
+				}
+				await applySettings(fork, models, settings, chatInstructions[String(fork.id)]);
 				await openChat(fork);
 				send(await chatList());
 			} else if (msg.type === "new") {
 				const conv = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 				titles[String(conv.id)] = "Chat";
 				saveTitles(config.dataDir, titles);
-				await applySettings(conv, models, settings);
+				await applySettings(conv, models, settings, chatInstructions[String(conv.id)]);
 				await openChat(conv);
 				send(await chatList());
 			} else if (msg.type === "open") {
@@ -264,6 +273,17 @@ wss.on("connection", async (socket: WebSocket) => {
 				saveSettings(config.dataDir, next);
 				settings = next;
 				send(settingsPayload());
+			} else if (msg.type === "chat-instructions") {
+				// Extra instructions for this chat only. Applied from its next request.
+				const problem = checkChatInstructions(msg.text);
+				if (problem) return send({ type: "error", message: problem });
+				const text = (msg.text as string).trim();
+				const key = String(active.id);
+				if (text) chatInstructions[key] = text;
+				else delete chatInstructions[key];
+				saveChatInstructions(config.dataDir, chatInstructions);
+				await applySettings(active, models, settings, text);
+				send({ type: "chat-instructions", conversationId: active.id, instructions: text });
 			} else if (msg.type === "review") {
 				// Answer review for this chat only. Takes effect on the next answer.
 				const patch: { on?: boolean; reviewerModel?: string | null } = {};

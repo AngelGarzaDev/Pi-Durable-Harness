@@ -196,3 +196,11 @@
 - Backup by streaming tar (bind mount not used). deploy.sh → healthy at 8790, .deployed-commit 2a08cad. Read-only WS checks only.
 - 2026-11-22 prod 5185cc3: chat list order corrected to reverse chronological (newest first). Deployed after backup.
 - 2026-11-22 questions placement (user m01134): the question cards from the harness now sit below the transcript, just above the composer, not above the transcript. DOM order change only in public/index.html.
+
+## 2026-11-23 Per-chat instructions (step 1 of the per-chat workspace plan, user m01170)
+- Each chat has an optional text box ("Chat instructions", src/chat-instructions.ts). It is appended after the base INSTRUCTIONS, never replacing them, so workspace rules always stay in force.
+- Stored in <DATA_DIR>/chat-instructions.json, keyed by conversation id (tmp file + rename). Pi Durable's conversation.configure({ instructions }) receives the composed text; the library renders it last, so prompt caching is unaffected.
+- A fork copies its parent's text; a new chat starts empty; clearing the box removes the entry.
+- Max 8000 characters, checked on the server. Applies from the next request.
+- Tests: tests/chat-instructions.test.ts (unit, 5), tests/chat-instructions-ws.test.ts (real server, 4). Suite 95/95 at this commit.
+- Not done yet: browser click-through of the box; a live model check (would be one claude-haiku-5-5 call, a few cents at most; not run).

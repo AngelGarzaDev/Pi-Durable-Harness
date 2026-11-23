@@ -49,6 +49,11 @@ button.linkish:hover { color: var(--text); background: none; }
 #settings input { width: 8rem; }
 #settings button { padding: .3rem .7rem; }
 #settings-msg { color: var(--muted); }
+#instr { margin: 0 0 .5rem; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: .4rem .7rem; color: var(--muted); font-size: .85rem; }
+#instr summary { cursor: pointer; }
+#instr textarea { width: 100%; box-sizing: border-box; margin: .4rem 0; padding: .4rem .5rem; font: inherit; }
+#instr button { padding: .3rem .7rem; }
+#instrmsg { color: var(--muted); }
 .keyrow { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: 0 0 .5rem; color: var(--muted); font-size: .85rem; }
 .keyrow input { width: 17rem; }
 #keymsg { color: var(--muted); }
@@ -152,6 +157,13 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     <label>Max tool rounds <input id="maxturns" type="number" min="1" step="1" style="width:6rem"></label>
     <button type="submit">Apply</button> <span id="settings-msg"></span>
   </form>
+  <details id="instr">
+    <summary>Chat instructions</summary>
+    <form id="instrform">
+      <textarea id="instrtext" rows="3" maxlength="8000" placeholder="Extra instructions for this chat only (optional). They are added after the base rules and apply from the next request."></textarea>
+      <div class="row"><button type="submit">Save instructions</button> <span id="instrmsg"></span></div>
+    </form>
+  </details>
   <form id="keyform" class="keyrow">
     <span>Anthropic key: <span id="keysource">checking…</span></span>
     <input id="keyinput" type="password" autocomplete="off" placeholder="sk-ant-… (stored in this app's data, never shown again)">

@@ -174,6 +174,8 @@ ws.onmessage = (e) => {
 	} else if (msg.type === "open") {
 		openId = msg.conversationId;
 		titleEl.textContent = msg.title;
+		instrText.value = msg.instructions ?? "";
+		instrMsg.textContent = "";
 		status.textContent = "connected";
 		ws.send(JSON.stringify({ type: "list" }));
 	} else if (msg.type === "chats") renderChats(msg.chats);
@@ -182,6 +184,9 @@ ws.onmessage = (e) => {
 		settingsMsg.textContent = msg.message;
 		keyMsg.textContent = msg.message;
 		mcpMsg.textContent = msg.message;
+		instrMsg.textContent = msg.message;
+	} else if (msg.type === "chat-instructions") {
+		instrMsg.textContent = msg.instructions ? "Saved. Applies from the next request." : "Cleared for this chat.";
 	} else if (msg.type === "settings") showSettings(msg);
 	else if (msg.type === "auth") showKey(msg.anthropic);
 	else if (msg.type === "mcp") showMcp(msg);
@@ -251,6 +256,13 @@ modelSelect.onchange = () => {
 };
 limitInput.oninput = () => (settingsMsg.textContent = "Not applied yet.");
 maxTurnsInput.oninput = () => (settingsMsg.textContent = "Not applied yet.");
+const instrText = document.getElementById("instrtext");
+const instrMsg = document.getElementById("instrmsg");
+document.getElementById("instrform").onsubmit = (e) => {
+	e.preventDefault();
+	instrMsg.textContent = "Saving…";
+	ws.send(JSON.stringify({ type: "chat-instructions", text: instrText.value }));
+};
 document.getElementById("settings").onsubmit = (e) => {
 	e.preventDefault();
 	settingsMsg.textContent = "Applying…";
