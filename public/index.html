@@ -167,7 +167,7 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
   <details id="instr">
     <summary>Chat instructions</summary>
     <form id="instrform">
-      <textarea id="instrtext" rows="3" maxlength="8000" placeholder="Extra instructions for this chat only (optional). They are added after the base rules and apply from the next request."></textarea>
+      <textarea id="instrtext" rows="3" autocomplete="off" data-form-type="other" data-lpignore="true" maxlength="8000" placeholder="Extra instructions for this chat only (optional). They are added after the base rules and apply from the next request."></textarea>
       <div class="row"><button type="submit">Save instructions</button> <button type="button" id="loadagents" disabled title="Copies AGENTS.md from this chat's folder into the box above, replacing an earlier copy. Chats without a folder have none.">Load AGENTS.md from folder</button> <span id="instrmsg"></span></div>
     </form>
   </details>
@@ -194,8 +194,8 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
   <div id="notice" class="notice" hidden></div>
   <div id="transcript"></div>
   <div id="questions"></div>
-  <form id="f" class="bar">
-    <input id="msg" autofocus placeholder="Type a message">
+  <form id="f" class="bar" autocomplete="off">
+    <input id="msg" autofocus autocomplete="off" autocapitalize="sentences" spellcheck="true" data-form-type="other" data-lpignore="true" placeholder="Type a message">
     <button id="send" title="Waits until Claude finishes the current answer">Send</button>
     <button type="button" id="steer" title="Adds your message to the answer in progress, after the current tool step finishes. The answer does not stop.">Steer</button>
   </form>

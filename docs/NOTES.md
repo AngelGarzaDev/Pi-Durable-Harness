@@ -236,3 +236,8 @@
 - Not browser-checked: needs sign-in by the user (token is not put in tool calls).
 - 2026-11-23 production deploy 06da1bc (user m01441, sidebar grouped by folder). Backup deploy/production/backup/app-data-pre-sidebar-2026-11-23.tgz (709 KB). deploy.sh healthy at 8790; healthz ok; prod serves the new app.js (groupByFolder present). No chat or folder changed on prod; no model call.
 - 2026-11-23 user decisions (m01458): life-manager prompt dropped; goal 5.2 (second user check) parked for later. Goals 1-3 confirmed done per docs/PLAN.md. Browser check of the folder sidebar, instructions box and Load AGENTS.md passed (user m01450). "Save to folder AGENTS.md" button declined (m01450), not built.
+
+## 2026-11-23 No autofill history for the chat box (user m01463)
+- public/index.html: #msg, form #f and #instrtext get autocomplete="off" (plus data-form-type="other" and data-lpignore="true" for password managers). #msg has no name attribute, since browsers key autofill history on it.
+- Browsers may still keep history for fields they consider "address-like"; autocomplete="off" is the standard request, and Chrome/Firefox generally honour it for typed-text history. Not verified in a browser (needs sign-in); check after the next visit.
+- Tests: tests/autofill-off.test.ts (3). Suite 114/114.

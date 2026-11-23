@@ -16,7 +16,7 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 4. Life-manager prompt: DROPPED by user (m01458). Not pending.
 
 ## How to test
-- npm run typecheck && npm test (111 passing).
+- npm run typecheck && npm test (114 passing).
 - Dev: docker compose up -d --build; curl -s http://127.0.0.1:8787/healthz → ok.
 
 ## Known gaps
