@@ -1,7 +1,7 @@
 # STATE (handoff)
 
 ## Current task
-Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructions, f05ab08) and step 2 (per-chat folder under /workspace, commit below) DONE. Step 3 (AGENTS.md from folder into instructions) DONE, on prod at 0a61619. Prod deployed c190f7c (steps 1+2+3 + sidebar grouping + autofill off), healthy, backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz.
+Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructions, f05ab08) and step 2 (per-chat folder under /workspace, commit below) DONE. Step 3 (AGENTS.md from folder into instructions) DONE, on prod at 0a61619. Prod deployed 8fb7f51 (steps 1+2+3 + sidebar grouping + autofill off + per-folder +), healthy, backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz.
 
 ## Done recently
 - Step 2 per-chat folder: src/chat-folder.ts, harness env factory uses agent cwd, server "new" takes folder, mkdir on runner, UI folder box in sidebar. tests/chat-folder.test.ts. Dev live check: pwd in folder livecheck gave /workspace/livecheck.
@@ -12,7 +12,6 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 ## Next steps
 1. Browser check of the instructions box and folder box on dev (sign in in the browser only).
 2. Sidebar grouping on prod (06da1bc); browser check pending (needs user sign-in).
-3. "+" per folder in sidebar built (dev only, not on prod yet).
 4. Browser click-through of instructions, folder and Load AGENTS.md boxes (needs user sign-in).
 4. Life-manager prompt: DROPPED by user (m01458). Not pending.
 

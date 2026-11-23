@@ -247,3 +247,4 @@
 - public/app.js renderChats: each folder header is now a row (.folder-row) with the toggle button and a "+" button (.folder-plus, title "New chat in /workspace/<folder>"). "+" sends {type:"new", folder} — the same path as the new-chat form, so it runs mkdir -p (idempotent for an existing folder) and reads the folder's AGENTS.md into the new chat's instructions.
 - Button is not nested in the toggle button (invalid HTML).
 - Suite 114/114. Not browser-checked (needs sign-in).
+- 2026-11-23 production deploy 8fb7f51 (user m01493, "+" per workspace). Backup deploy/production/backup/app-data-pre-plus-2026-11-23.tgz (206 KB). deploy.sh healthy at 8790; healthz ok; prod serves the new app.js. No model call, no chat changed.
