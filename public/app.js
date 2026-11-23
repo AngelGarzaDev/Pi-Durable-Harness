@@ -147,6 +147,8 @@ function renderChats(chats) {
 		const hasFolder = group.folder !== "";
 		const isCollapsed = hasFolder && collapsed.has(group.folder);
 		if (hasFolder) {
+			const row = document.createElement("div");
+			row.className = "folder-row";
 			const h = document.createElement("button");
 			h.type = "button";
 			h.className = "folder";
@@ -159,7 +161,15 @@ function renderChats(chats) {
 				localStorage.setItem(collapsedKey, JSON.stringify([...collapsed]));
 				renderChats();
 			};
-			chatList.appendChild(h);
+			const plus = document.createElement("button");
+			plus.type = "button";
+			plus.className = "folder-plus";
+			plus.textContent = "+";
+			plus.title = "New chat in /workspace/" + group.folder;
+			plus.setAttribute("aria-label", "New chat in " + group.folder);
+			plus.onclick = () => ws.send(JSON.stringify({ type: "new", folder: group.folder }));
+			row.append(h, plus);
+			chatList.appendChild(row);
 		}
 		if (isCollapsed) continue;
 		for (const [c, child] of group.chats) {

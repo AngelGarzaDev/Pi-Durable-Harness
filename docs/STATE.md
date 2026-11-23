@@ -12,7 +12,8 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 ## Next steps
 1. Browser check of the instructions box and folder box on dev (sign in in the browser only).
 2. Sidebar grouping on prod (06da1bc); browser check pending (needs user sign-in).
-3. Browser click-through of instructions, folder and Load AGENTS.md boxes (needs user sign-in).
+3. "+" per folder in sidebar built (dev only, not on prod yet).
+4. Browser click-through of instructions, folder and Load AGENTS.md boxes (needs user sign-in).
 4. Life-manager prompt: DROPPED by user (m01458). Not pending.
 
 ## How to test
