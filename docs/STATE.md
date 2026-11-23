@@ -13,7 +13,7 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 1. Browser check of the instructions box and folder box on dev (sign in in the browser only).
 2. Sidebar grouping on prod (06da1bc); browser check pending (needs user sign-in).
 3. Browser click-through of instructions, folder and Load AGENTS.md boxes (needs user sign-in).
-4. Life-manager prompt: waiting on user (what to manage, m01158).
+4. Life-manager prompt: DROPPED by user (m01458). Not pending.
 
 ## How to test
 - npm run typecheck && npm test (111 passing).
@@ -21,7 +21,7 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 
 ## Known gaps
 - Browser click-through not done for goal 6/7/8 UI, restyle, chat order, or the new instructions box.
-- Goal 5.2 blocked (second account).
+- Goal 5.2 (second real user check): PARKED by user (m01458), needs a second account. Revisit later.
 
 ## Needs you
 - Test chats/files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt, /workspace/mcp-live) — do not delete without approval.
