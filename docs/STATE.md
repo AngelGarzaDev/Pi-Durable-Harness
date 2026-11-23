@@ -1,7 +1,7 @@
 # STATE (handoff)
 
 ## Current task
-Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructions, f05ab08) and step 2 (per-chat folder under /workspace, commit below) DONE. Step 3 not started. Prod deploy of steps 1+2 in progress (see Done recently).
+Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructions, f05ab08) and step 2 (per-chat folder under /workspace, commit below) DONE. Step 3 not started. Prod deployed f3fa285 (steps 1+2), healthy, backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz.
 
 ## Done recently
 - Step 2 per-chat folder: src/chat-folder.ts, harness env factory uses agent cwd, server "new" takes folder, mkdir on runner, UI folder box in sidebar. tests/chat-folder.test.ts. Dev live check: pwd in folder livecheck gave /workspace/livecheck.
@@ -24,4 +24,4 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 
 ## Needs you
 - Test chats/files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt, /workspace/mcp-live) — do not delete without approval.
-- Production redeploy: user asked for steps 1+2 (m01213). Backup first to deploy/production/backup/.
+- Prod on f3fa285 (steps 1+2). Browser check of new boxes on prod not done (needs sign-in by user).
