@@ -9,7 +9,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WebSocket } from "ws";
 import { checkFolderName, folderPath, loadChatFolders, saveChatFolders } from "../src/chat-folder.js";
-import { mergeAgentsMd } from "../src/agents-md.js";
 
 test("folder names: plain single names only", () => {
 	for (const ok of ["notes", "my-project", "a.b_c", "2026", "A1"]) assert.equal(checkFolderName(ok), undefined, ok);
@@ -147,12 +146,13 @@ test("the folder map on disk is what the app loaded", () => {
 	assert.ok(readFileSync(join(dataDir, "data", "chat-folders.json"), "utf8").includes("notes"));
 });
 
-// Step 3: a folder's AGENTS.md is copied into the chat's instructions box.
-test("a new chat in a folder with AGENTS.md takes that text into its instructions", async () => {
+// Single source: a folder's AGENTS.md is read for the model, never copied into the chat's own box.
+test("a new chat in a folder with AGENTS.md: the model gets the file, the chat box stays empty", async () => {
 	agentsText = "Use tabs.\nRun npm test.";
 	try {
 		const opened = await ask({ type: "new", folder: "withagents" }, "open");
-		assert.match(opened.instructions, /^--- AGENTS\.md from this chat's folder ---\nUse tabs\.\nRun npm test\.$/);
+		assert.equal(opened.instructions, "");
+		assert.match(opened.modelInstructions, /Instructions from the person[^\n]*:\nUse tabs\.\nRun npm test\.$/);
 	} finally {
 		agentsText = null;
 	}
@@ -162,17 +162,17 @@ test("a new chat in a folder without AGENTS.md has empty instructions", async ()
 	agentsText = null;
 	const opened = await ask({ type: "new", folder: "noagents" }, "open");
 	assert.equal(opened.instructions, "");
+	assert.equal(opened.modelInstructions.includes("Instructions from the person"), false);
 });
 
-test("load AGENTS.md keeps the person's own text and replaces an earlier copy", async () => {
-	agentsText = "version one";
+test("the folder rules reach the model without the chat's own note being copied in", async () => {
+	agentsText = "Folder rule.";
 	try {
-		const opened = await ask({ type: "new", folder: "reload" }, "open");
-		assert.match(opened.instructions, /version one/);
+		const opened = await ask({ type: "new", folder: "ownnote" }, "open");
+		assert.match(opened.modelInstructions, /:\nFolder rule\.$/);
 		await ask({ type: "chat-instructions", text: "My own note." }, "chat-instructions");
-		agentsText = "version two";
-		const reply = await ask({ type: "load-agents" }, "chat-instructions");
-		assert.equal(reply.instructions, "My own note.\n\n--- AGENTS.md from this chat's folder ---\nversion two");
+		const reopened = await ask({ type: "chat-instructions", text: "My own note." }, "chat-instructions");
+		assert.equal(reopened.instructions, "My own note.");
 	} finally {
 		agentsText = null;
 	}
@@ -186,18 +186,4 @@ test("an AGENTS.md longer than the instructions limit is refused before a chat e
 	} finally {
 		agentsText = null;
 	}
-});
-
-test("load AGENTS.md in a chat without a folder is refused", async () => {
-	const opened = await ask({ type: "new" }, "open");
-	assert.equal(opened.folder, "");
-	const reply = await ask({ type: "load-agents" }, "error");
-	assert.equal(reply.message, "This chat has no folder.");
-});
-
-test("merge: replaces an earlier AGENTS.md block and keeps the person's own text first", () => {
-	assert.equal(mergeAgentsMd("", "rules"), "--- AGENTS.md from this chat's folder ---\nrules");
-	const once = mergeAgentsMd("own", "v1");
-	assert.equal(once, "own\n\n--- AGENTS.md from this chat's folder ---\nv1");
-	assert.equal(mergeAgentsMd(once, "v2"), "own\n\n--- AGENTS.md from this chat's folder ---\nv2");
 });

@@ -164,15 +164,11 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     <fieldset><legend>MCP servers</legend><div id="wsmcp" class="muted">Loading…</div></fieldset>
     <div class="row"><button type="submit">Save defaults</button> <span id="wscfgmsg"></span></div>
   </form>
-  <form id="wsform">
-    <h3>Instructions</h3>
-    <textarea id="wstext" rows="6" maxlength="8000" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="Instructions for this workspace (optional)."></textarea>
-    <div class="row"><button type="submit">Save instructions</button> <button type="button" id="wsloadagents" title="Copies AGENTS.md from this workspace folder into the box above, replacing an earlier copy.">Load AGENTS.md from folder</button> <span id="wsmsg"></span></div>
-  </form>
   <form id="wsagentsform">
-    <h3>AGENTS.md in this folder</h3>
+    <h3>Rules: AGENTS.md in this folder</h3>
+    <p class="muted">This file is the only place rules for this workspace live. The model reads it before each message, so edits apply from the next message. Chat instructions are added after it.</p>
     <textarea id="wsagents" rows="8" maxlength="8000" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="No AGENTS.md yet."></textarea>
-    <div class="row"><button type="submit">Write AGENTS.md</button> <span id="wsagentsmsg"></span></div>
+    <div class="row"><button type="submit">Save AGENTS.md</button> <span id="wsagentsmsg"></span></div>
   </form>
   <p><button type="button" id="wsclose">Close</button></p>
 </dialog>
@@ -224,7 +220,7 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     <summary>Chat instructions</summary>
     <form id="instrform">
       <textarea id="instrtext" rows="3" autocomplete="off" data-form-type="other" data-lpignore="true" maxlength="8000" placeholder="Extra instructions for this chat only (optional). They are added after the base rules and apply from the next request."></textarea>
-      <div class="row"><button type="submit">Save instructions</button> <button type="button" id="loadagents" disabled title="Copies AGENTS.md from this chat's folder into the box above, replacing an earlier copy. Chats without a folder have none.">Load AGENTS.md from folder</button> <span id="instrmsg"></span></div>
+      <div class="row"><button type="submit">Save instructions</button> <span id="instrmsg"></span></div>
     </form>
   </details>
   <div id="notice" class="notice" hidden></div>

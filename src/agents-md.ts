@@ -1,20 +1,22 @@
 import type { Context } from "@earendil-works/chord/context";
 import type { RemoteExecutionEnv } from "./tools/remote-env.js";
 
-// Step 3: a chat in a folder can take that folder's AGENTS.md into its own instructions. The text is copied into
-// the chat's instructions box (one block, marked by AGENTS_HEADER), so the person sees and can edit exactly what
-// the model gets. Nothing is read from the folder after that unless the person asks again.
+// A folder's rules are its AGENTS.md file (single source; see folder-rules.ts). The chat box holds only per-chat notes.
 export const AGENTS_FILE = "AGENTS.md";
+// Marker of the block that step 3 copied into chat boxes. Only used to strip those old copies.
 export const AGENTS_HEADER = "--- AGENTS.md from this chat's folder ---";
 // Same cap as the instructions box (MAX_CHAT_INSTRUCTIONS in chat-instructions.ts); a bigger file is refused, not cut.
 export const AGENTS_MAX_CHARS = 8000;
 
-// Puts the folder's AGENTS.md text in place of any block loaded earlier, after the person's own text.
-export function mergeAgentsMd(existing: string, agents: string): string {
-	const at = existing.indexOf(AGENTS_HEADER);
-	const own = (at >= 0 ? existing.slice(0, at) : existing).trim();
-	const block = `${AGENTS_HEADER}\n${agents.trim()}`;
-	return own ? `${own}\n\n${block}` : block;
+// The folder rules first, then the chat's own text. Empty parts are left out.
+export function combineInstructions(rules: string | undefined, chat: string | undefined): string {
+	return [rules, chat].map((t) => (t ?? "").trim()).filter((t) => t !== "").join("\n\n");
+}
+
+// The chat text without a copy of AGENTS.md that an earlier version put into it.
+export function stripLegacyBlock(text: string): string {
+	const at = text.indexOf(AGENTS_HEADER);
+	return (at >= 0 ? text.slice(0, at) : text).trim();
 }
 
 export type AgentsRead = { found: false } | { found: true; text: string } | { error: string };

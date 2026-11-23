@@ -221,7 +221,6 @@ ws.onmessage = (e) => {
 		instrText.value = msg.instructions ?? "";
 		instrMsg.textContent = "";
 		status.textContent = msg.folder ? "connected · folder " + msg.folder : "connected";
-		document.getElementById("loadagents").disabled = !msg.folder;
 		newMsg.textContent = "";
 		ws.send(JSON.stringify({ type: "list" }));
 	} else if (msg.type === "chats") renderChats(msg.chats);
@@ -233,7 +232,6 @@ ws.onmessage = (e) => {
 		mcpMsg.textContent = msg.message;
 		instrMsg.textContent = msg.message;
 		if (wsdlg.open) {
-			wsMsg.textContent = msg.message;
 			wsCfgMsg.textContent = msg.message;
 			wsAgentsMsg.textContent = msg.message;
 		}
@@ -301,8 +299,6 @@ document.getElementById("globalclose").onclick = () => globalDlg.close();
 // Workspace settings dialog: one per /workspace/<folder>, opened from the folder's gear button.
 const wsdlg = document.getElementById("wsdlg");
 const wsTitle = document.getElementById("wstitle");
-const wsText = document.getElementById("wstext");
-const wsMsg = document.getElementById("wsmsg");
 const wsModel = document.getElementById("wsmodel");
 const wsLimit = document.getElementById("wslimit");
 const wsMaxTurns = document.getElementById("wsmaxturns");
@@ -315,10 +311,8 @@ let wsMcpNames = [];
 function openWorkspace(folder) {
 	wsFolder = folder;
 	wsTitle.textContent = "Workspace /workspace/" + folder;
-	wsText.value = "";
 	wsAgents.value = "";
-	wsAgentsMsg.textContent = "";
-	wsMsg.textContent = "Loading…";
+	wsAgentsMsg.textContent = "Loading…";
 	wsCfgMsg.textContent = "";
 	wsMcp.textContent = "Loading…";
 	fillWsModels();
@@ -333,8 +327,6 @@ function fillWsModels() {
 }
 function showWorkspace(msg) {
 	if (msg.folder !== wsFolder) return;
-	wsText.value = msg.instructions ?? "";
-	wsMsg.textContent = msg.chats + " chat(s) use this workspace.";
 	const cfg = msg.config ?? {};
 	fillWsModels();
 	wsModel.value = cfg.modelId ?? "";
@@ -364,15 +356,6 @@ function showWorkspaceAgents(msg) {
 	wsAgentsMsg.textContent = msg.found ? "" : "No AGENTS.md in this folder yet.";
 }
 document.getElementById("wsclose").onclick = () => wsdlg.close();
-document.getElementById("wsform").onsubmit = (e) => {
-	e.preventDefault();
-	wsMsg.textContent = "Saving…";
-	ws.send(JSON.stringify({ type: "workspace-save", folder: wsFolder, text: wsText.value }));
-};
-document.getElementById("wsloadagents").onclick = () => {
-	wsMsg.textContent = "Loading AGENTS.md…";
-	ws.send(JSON.stringify({ type: "workspace-load-agents", folder: wsFolder }));
-};
 document.getElementById("wscfgform").onsubmit = (e) => {
 	e.preventDefault();
 	const disabledMcp = [...wsMcp.querySelectorAll("input[type=checkbox]")].filter((b) => !b.checked).map((b) => b.value);
@@ -417,10 +400,6 @@ limitInput.oninput = () => (settingsMsg.textContent = "Not applied yet.");
 maxTurnsInput.oninput = () => (settingsMsg.textContent = "Not applied yet.");
 const instrText = document.getElementById("instrtext");
 const instrMsg = document.getElementById("instrmsg");
-document.getElementById("loadagents").onclick = () => {
-	instrMsg.textContent = "Loading…";
-	ws.send(JSON.stringify({ type: "load-agents" }));
-};
 document.getElementById("instrform").onsubmit = (e) => {
 	e.preventDefault();
 	instrMsg.textContent = "Saving…";
