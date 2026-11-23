@@ -195,3 +195,4 @@
 ## 2026-11-22 production deploy 2a08cad (user m01101)
 - Backup by streaming tar (bind mount not used). deploy.sh → healthy at 8790, .deployed-commit 2a08cad. Read-only WS checks only.
 - 2026-11-22 prod 5185cc3: chat list order corrected to reverse chronological (newest first). Deployed after backup.
+- 2026-11-22 questions placement (user m01134): the question cards from the harness now sit below the transcript, just above the composer, not above the transcript. DOM order change only in public/index.html.

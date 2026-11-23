@@ -124,7 +124,7 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
 #actions button, #actions select { padding: .3rem .7rem; font-size: .85rem; }
 #stop { color: #f08c8c; }
 
-/* the transcript column stays centred even when the notice/questions sit above it */
+/* the transcript column stays centred even when the notice sits above it. Questions sit just above the composer. */
 #notice, #questions { max-width: 46rem; width: 100%; margin-left: auto; margin-right: auto; }
 
 @media (max-width: 760px) {
@@ -173,8 +173,8 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     </form>
   </details>
   <div id="notice" class="notice" hidden></div>
-  <div id="questions"></div>
   <div id="transcript"></div>
+  <div id="questions"></div>
   <form id="f" class="bar">
     <input id="msg" autofocus placeholder="Type a message">
     <button id="send" title="Waits until Claude finishes the current answer">Send</button>
