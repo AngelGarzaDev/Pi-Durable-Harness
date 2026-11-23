@@ -204,3 +204,13 @@
 - Max 8000 characters, checked on the server. Applies from the next request.
 - Tests: tests/chat-instructions.test.ts (unit, 5), tests/chat-instructions-ws.test.ts (real server, 4). Suite 95/95 at this commit.
 - Not done yet: browser click-through of the box; a live model check (would be one claude-haiku-5-5 call, a few cents at most; not run).
+
+## 2026-11-23 Per-chat folder (step 2, user m01213)
+- A new chat may name a folder: one plain name directly under /workspace (src/chat-folder.ts: ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$, no "..", no slashes). Chosen at creation and fixed; no move/rename.
+- The folder is created on the runner first (`mkdir -p -- <name>` via RemoteExecutionEnv.exec with cwd /workspace). If that fails, no chat is created. Stored in <DATA_DIR>/chat-folders.json.
+- The chat's cwd is set with conversation.configure({ cwd: "/workspace/<name>" }). The env factory in src/harness.ts is now `({ cwd }) => new RemoteExecutionEnv(url, token, cwd ?? "/workspace")`; Pi Durable builds the env per run from the stored agent cwd (harness.js buildEnv).
+- Forks inherit the parent's folder. Chats without a folder are unchanged (/workspace).
+- Surprise: RemoteExecutionEnv.exec sends no cwd unless one is passed, so the mkdir passes cwd explicitly.
+- Tests: tests/chat-folder.test.ts (7: name rules, map round-trip, WS create/refuse/runner-failure/no-folder). Suite 102/102.
+- Live check on dev (haiku, default model, 2 short calls, roughly 1 cent): chat in folder "livecheck" ran `pwd` via bash and the reply contained /workspace/livecheck. Shows the cwd reaches the runner's tools.
+- Not done: step 3 (read AGENTS.md from the folder), browser click-through of the folder box.
