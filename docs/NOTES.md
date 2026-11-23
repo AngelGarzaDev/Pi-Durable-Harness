@@ -216,3 +216,13 @@
 - Not done: step 3 (read AGENTS.md from the folder), browser click-through of the folder box.
 - 2026-11-23 production deploy f3fa285 (user m01213, steps 1+2): backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz (stream tar, 245 KB). deploy.sh healthy at 8790. Read-only WS check: 3 chats listed, Anthropic key source secret. No chat created on prod, no model call on prod.
 - 2026-11-23 push policy (user m01334): ../AGENTS.md now allows pushing to origin main after each tested step without asking (typecheck + test passing, docs committed). Only that remote, no force-push.
+
+## 2026-11-23 Step 3: folder AGENTS.md into chat instructions (user m01344)
+- src/agents-md.ts: readFolderAgents reads <folder>/AGENTS.md through the runner (`test -f`, then `head -c 8001`; cwd = the folder). Missing file = nothing loaded; runner failure or file over 8000 characters = error, nothing copied (no truncation).
+- Copy, not link: the text goes into the chat's instructions box as one block headed "--- AGENTS.md from this chat's folder ---". The person sees and can edit exactly what the model gets. Nothing is read again unless asked.
+- When: at creation of a chat in a folder (read before the chat exists, so a refusal leaves no chat), and on demand: "Load AGENTS.md from folder" button (enabled only in chats with a folder) sends {type:"load-agents"}. Load keeps the person's own text and replaces an earlier block.
+- Reason for an explicit button: a file in the workspace can be changed by the model itself, so reloading is always a person's choice.
+- Test change: tests/chat-folder.test.ts runner stub now answers test/head. The "new with folder" test checks runnerCalls[0] (mkdir) instead of the last call, since the AGENTS.md probe follows it.
+- Tests: 108/108 (5 new WS/merge tests in chat-folder.test.ts).
+- Dev live check (no model call): folder with 2-line AGENTS.md, new chat, open message carried the block exactly. Test folder removed from the dev workspace afterwards.
+- Prod NOT redeployed for step 3 (AGENTS.md: prod changes need the user's request).

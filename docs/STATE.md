@@ -1,7 +1,7 @@
 # STATE (handoff)
 
 ## Current task
-Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructions, f05ab08) and step 2 (per-chat folder under /workspace, commit below) DONE. Step 3 not started. Prod deployed f3fa285 (steps 1+2), healthy, backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz.
+Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructions, f05ab08) and step 2 (per-chat folder under /workspace, commit below) DONE. Step 3 (AGENTS.md from folder into instructions) DONE on dev, not on prod. Prod deployed f3fa285 (steps 1+2), healthy, backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz.
 
 ## Done recently
 - Step 2 per-chat folder: src/chat-folder.ts, harness env factory uses agent cwd, server "new" takes folder, mkdir on runner, UI folder box in sidebar. tests/chat-folder.test.ts. Dev live check: pwd in folder livecheck gave /workspace/livecheck.
@@ -11,11 +11,11 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 
 ## Next steps
 1. Browser check of the instructions box and folder box on dev (sign in in the browser only).
-2. Step 3: read AGENTS.md from the chat's folder via the runner, add to that chat's instructions.
+2. Ask whether to deploy step 3 to prod (dev checked; prod still f3fa285).
 4. Life-manager prompt: waiting on user (what to manage, m01158).
 
 ## How to test
-- npm run typecheck && npm test (102 passing).
+- npm run typecheck && npm test (108 passing).
 - Dev: docker compose up -d --build; curl -s http://127.0.0.1:8787/healthz → ok.
 
 ## Known gaps
