@@ -1,7 +1,7 @@
 # STATE (handoff)
 
 ## Current task
-Goal 9 (single-source AGENTS.md): DONE on dev and prod. Bug fix 19b66ae (workspace-get restored) on dev and origin; prod still on a1c0cf6 (not yet redeployed; asked user).
+Goal 9 (single-source AGENTS.md): DONE on dev and prod. Prod on 83d5fa7 (workspace-get fix). Next: browser check of workspace dialog (needs sign-in).
 
 ## Done recently
 - Goal 9 (3090ef5): src/folder-rules.ts (FolderRules, legacy migration); src/agents-md.ts (combineInstructions, stripLegacyBlock); src/workspace-settings.ts deleted; src/server.ts reads AGENTS.md before each submit in a folder; UI: workspace dialog edits AGENTS.md only, both Load AGENTS.md buttons removed (public/index.html, public/app.js). Tests: tests/folder-rules.test.ts (new), tests/chat-folder.test.ts (copy tests replaced), tests/workspace-settings.test.ts deleted.
