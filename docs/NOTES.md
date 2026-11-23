@@ -272,3 +272,4 @@
 - MCP off per folder: applyChat passes disabledMcp; harness applySettings sends extensions {remove: [defineExtension({name:"mcp:<n>", tools:[]})]}, or null when none are off. configure accepts it; that the model's tool list drops the server is NOT verified live.
 - Test lesson: the runner stub returned exitCode 1 for every exec, so the folder mkdir failed and "open" never arrived. Fixed in tests/workspace-config.test.ts (mkdir succeeds, AGENTS.md probe fails).
 - Overlap: chat "Load AGENTS.md" and workspace "Load AGENTS.md" insert the same block; the text keeps one copy per source, so a chat can hold it twice. Known, documented.
+- 2026-11-23 prod deploy e30c0b7 (workspace defaults). Backup deploy/production/backup/app-data-pre-workspace-defaults-2026-11-23.tgz (226 KB). healthz ok at 8790; served index.html/app.js contain the new dialog. No chat changed on prod; no model call.

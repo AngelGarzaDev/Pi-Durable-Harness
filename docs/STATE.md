@@ -1,7 +1,7 @@
 # STATE (handoff)
 
 ## Current task
-Workspace defaults (user m01601): DONE in code, commit fc4efe4, suite 131/131. Not yet on prod (user m01536: push to prod after testing). Browser click-through pending (user sign-in).
+Workspace defaults (user m01601): DONE in code, commit fc4efe4, suite 131/131. Pushed origin e30c0b7 and deployed to prod (backup deploy/production/backup/app-data-pre-workspace-defaults-2026-11-23.tgz). Browser click-through pending (user sign-in).
 Known gaps: chat view shows no note that a folder overrides the global settings; MCP off per folder is accepted by configure but tool list effect not verified live (no model call).
 
 ## Done recently
