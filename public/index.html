@@ -156,10 +156,23 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
 </style>
 <dialog id="wsdlg">
   <h2 id="wstitle">Workspace</h2>
-  <p class="muted">Instructions for every chat in this workspace. They go before each chat's own instructions and apply from the next request.</p>
+  <p class="muted">Defaults for every chat in this workspace. They apply to new and existing chats here from the next request. Empty fields use the global settings.</p>
+  <form id="wscfgform">
+    <label>Model <select id="wsmodel"></select></label>
+    <label>Context limit <input id="wslimit" type="number" min="20000" step="1000" placeholder="global"></label>
+    <label>Max tool rounds <input id="wsmaxturns" type="number" min="1" max="500" placeholder="global"></label>
+    <fieldset><legend>MCP servers</legend><div id="wsmcp" class="muted">Loading…</div></fieldset>
+    <div class="row"><button type="submit">Save defaults</button> <span id="wscfgmsg"></span></div>
+  </form>
   <form id="wsform">
+    <h3>Instructions</h3>
     <textarea id="wstext" rows="6" maxlength="8000" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="Instructions for this workspace (optional)."></textarea>
-    <div class="row"><button type="submit">Save</button> <button type="button" id="wsloadagents" title="Copies AGENTS.md from this workspace folder into the box above, replacing an earlier copy.">Load AGENTS.md from folder</button> <span id="wsmsg"></span></div>
+    <div class="row"><button type="submit">Save instructions</button> <button type="button" id="wsloadagents" title="Copies AGENTS.md from this workspace folder into the box above, replacing an earlier copy.">Load AGENTS.md from folder</button> <span id="wsmsg"></span></div>
+  </form>
+  <form id="wsagentsform">
+    <h3>AGENTS.md in this folder</h3>
+    <textarea id="wsagents" rows="8" maxlength="8000" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="No AGENTS.md yet."></textarea>
+    <div class="row"><button type="submit">Write AGENTS.md</button> <span id="wsagentsmsg"></span></div>
   </form>
   <p><button type="button" id="wsclose">Close</button></p>
 </dialog>

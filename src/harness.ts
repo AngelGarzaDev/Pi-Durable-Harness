@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, type Provider } from "@earendil-works/pi-ai/models";
 import { anthropicProvider } from "@earendil-works/pi-ai/providers/anthropic";
-import { createRegistry, Harness, type Conversation } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, Harness, type Conversation } from "@earendil-works/pi-durable";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { RemoteExecutionEnv } from "./tools/remote-env.js";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -85,15 +85,28 @@ export function listModels(models: ReturnType<typeof createModels>): ModelInfo[]
 	return models.getModels("anthropic").map((m) => ({ id: m.id, name: m.name, contextWindow: m.contextWindow }));
 }
 
-// Pushes model, compaction and instructions to the conversation. Takes effect on the next request.
-export async function applySettings(conversation: Conversation, models: ReturnType<typeof createModels>, s: ChatSettings, chatInstructions?: string, cwd?: string) {
+// Pushes model, compaction, instructions, folder and MCP choices to the conversation. Takes effect on the next request.
+// `disabledMcp` names MCP servers to switch off for this conversation; none disabled restores the host default.
+export async function applySettings(
+	conversation: Conversation,
+	models: ReturnType<typeof createModels>,
+	s: ChatSettings,
+	options: { instructions?: string; cwd?: string; disabledMcp?: string[] } = {},
+) {
 	const info = modelInfo(models, s.modelId);
 	if (!info) throw new Error(`Unknown model ${s.modelId}`);
+	const off = options.disabledMcp ?? [];
 	await conversation.configure({
 		model: { provider: "anthropic", modelId: s.modelId },
-		instructions: composeInstructions(chatInstructions),
+		instructions: composeInstructions(options.instructions),
 		compaction: compactionFor(s, info),
 		maxTurns: s.maxTurns,
-		...(cwd === undefined ? {} : { cwd }),
+		extensions: off.length === 0 ? null : { remove: off.map((name) => mcpStub(name)) },
+		...(options.cwd === undefined ? {} : { cwd: options.cwd }),
 	}, context);
+}
+
+// The MCP extension for a server, by name. Removing it from a conversation switches the server off there.
+export function mcpStub(name: string) {
+	return defineExtension({ name: `mcp:${name}`, tools: [] });
 }

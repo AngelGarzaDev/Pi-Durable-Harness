@@ -232,11 +232,16 @@ ws.onmessage = (e) => {
 		keyMsg.textContent = msg.message;
 		mcpMsg.textContent = msg.message;
 		instrMsg.textContent = msg.message;
-		if (wsdlg.open) wsMsg.textContent = msg.message;
+		if (wsdlg.open) {
+			wsMsg.textContent = msg.message;
+			wsCfgMsg.textContent = msg.message;
+			wsAgentsMsg.textContent = msg.message;
+		}
 	} else if (msg.type === "chat-instructions") {
 		instrText.value = msg.instructions ?? "";
 		instrMsg.textContent = msg.instructions ? "Saved. Applies from the next request." : "Cleared for this chat.";
 	} else if (msg.type === "workspace") showWorkspace(msg);
+	else if (msg.type === "workspace-agents") showWorkspaceAgents(msg);
 	else if (msg.type === "settings") showSettings(msg);
 	else if (msg.type === "auth") showKey(msg.anthropic);
 	else if (msg.type === "mcp") showMcp(msg);
@@ -298,19 +303,65 @@ const wsdlg = document.getElementById("wsdlg");
 const wsTitle = document.getElementById("wstitle");
 const wsText = document.getElementById("wstext");
 const wsMsg = document.getElementById("wsmsg");
+const wsModel = document.getElementById("wsmodel");
+const wsLimit = document.getElementById("wslimit");
+const wsMaxTurns = document.getElementById("wsmaxturns");
+const wsMcp = document.getElementById("wsmcp");
+const wsCfgMsg = document.getElementById("wscfgmsg");
+const wsAgents = document.getElementById("wsagents");
+const wsAgentsMsg = document.getElementById("wsagentsmsg");
 let wsFolder = "";
+let wsMcpNames = [];
 function openWorkspace(folder) {
 	wsFolder = folder;
 	wsTitle.textContent = "Workspace /workspace/" + folder;
 	wsText.value = "";
+	wsAgents.value = "";
+	wsAgentsMsg.textContent = "";
 	wsMsg.textContent = "Loading…";
+	wsCfgMsg.textContent = "";
+	wsMcp.textContent = "Loading…";
+	fillWsModels();
 	wsdlg.showModal();
 	ws.send(JSON.stringify({ type: "workspace-get", folder }));
+	ws.send(JSON.stringify({ type: "workspace-agents-get", folder }));
+}
+function fillWsModels() {
+	wsModel.textContent = "";
+	wsModel.appendChild(new Option("Global default", ""));
+	for (const m of current?.models ?? []) wsModel.appendChild(new Option(m.name, m.id));
 }
 function showWorkspace(msg) {
 	if (msg.folder !== wsFolder) return;
 	wsText.value = msg.instructions ?? "";
 	wsMsg.textContent = msg.chats + " chat(s) use this workspace.";
+	const cfg = msg.config ?? {};
+	fillWsModels();
+	wsModel.value = cfg.modelId ?? "";
+	wsLimit.value = cfg.contextLimit ?? "";
+	wsMaxTurns.value = cfg.maxTurns ?? "";
+	wsLimit.placeholder = current ? "global " + current.settings.contextLimit : "global";
+	wsMaxTurns.placeholder = current ? "global " + current.settings.maxTurns : "global";
+	const off = new Set(cfg.disabledMcp ?? []);
+	wsMcpNames = msg.mcp.map((s) => s.name);
+	wsMcp.textContent = "";
+	if (wsMcpNames.length === 0) wsMcp.textContent = "No MCP servers configured.";
+	for (const s of msg.mcp) {
+		const label = document.createElement("label");
+		label.className = "wsmcp-row";
+		const box = document.createElement("input");
+		box.type = "checkbox";
+		box.value = s.name;
+		box.checked = !off.has(s.name);
+		label.append(box, " " + s.name + " (" + s.state + ")");
+		wsMcp.appendChild(label);
+	}
+	wsCfgMsg.textContent = msg.warning ? msg.warning : "";
+}
+function showWorkspaceAgents(msg) {
+	if (msg.folder !== wsFolder) return;
+	wsAgents.value = msg.found ? msg.text : "";
+	wsAgentsMsg.textContent = msg.found ? "" : "No AGENTS.md in this folder yet.";
 }
 document.getElementById("wsclose").onclick = () => wsdlg.close();
 document.getElementById("wsform").onsubmit = (e) => {
@@ -321,6 +372,23 @@ document.getElementById("wsform").onsubmit = (e) => {
 document.getElementById("wsloadagents").onclick = () => {
 	wsMsg.textContent = "Loading AGENTS.md…";
 	ws.send(JSON.stringify({ type: "workspace-load-agents", folder: wsFolder }));
+};
+document.getElementById("wscfgform").onsubmit = (e) => {
+	e.preventDefault();
+	const disabledMcp = [...wsMcp.querySelectorAll("input[type=checkbox]")].filter((b) => !b.checked).map((b) => b.value);
+	const config = {
+		modelId: wsModel.value || null,
+		contextLimit: wsLimit.value === "" ? null : Number(wsLimit.value),
+		maxTurns: wsMaxTurns.value === "" ? null : Number(wsMaxTurns.value),
+		disabledMcp,
+	};
+	wsCfgMsg.textContent = "Saving…";
+	ws.send(JSON.stringify({ type: "workspace-config", folder: wsFolder, config }));
+};
+document.getElementById("wsagentsform").onsubmit = (e) => {
+	e.preventDefault();
+	wsAgentsMsg.textContent = "Writing…";
+	ws.send(JSON.stringify({ type: "workspace-agents-save", folder: wsFolder, text: wsAgents.value }));
 };
 let current = null;
 function showSettings(msg) {
