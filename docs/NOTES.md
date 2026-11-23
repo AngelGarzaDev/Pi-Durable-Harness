@@ -264,3 +264,11 @@
 - workspace-get/save/load only accept a folder that some chat uses. Reason: avoids creating settings for arbitrary names; folder names are already checked by checkFolderName.
 - Test: tests/workspace-settings.test.ts (8: combine order, storage, limit, WS get/save/clear/too-long/load/no-file). Browser check not done by the agent (needs user sign-in; token not used in tool calls).
 - 2026-11-23 production deploy 908b2df (user m01536). Backup deploy/production/backup/app-data-pre-settings-2026-11-23.tgz (279 KB). deploy.sh healthy at 8790; healthz ok; prod serves the new index.html. No model call, no chat changed.
+
+## 2026-11-23 Workspace defaults (fc4efe4)
+- Decision: folder defaults apply LIVE to all chats in the folder, not only to chats created afterwards. The request said "new chat"; live was chosen because a stale per-chat copy would make the dialog lie. Flag to user.
+- Decision: folder config is a separate file (workspace-config.json), not inside workspace-instructions.json, to keep the instructions format unchanged.
+- Decision: a folder combination that does not fit its model is refused on save, and at runtime falls back to global with a warning (a global model change can make an older folder setting invalid).
+- MCP off per folder: applyChat passes disabledMcp; harness applySettings sends extensions {remove: [defineExtension({name:"mcp:<n>", tools:[]})]}, or null when none are off. configure accepts it; that the model's tool list drops the server is NOT verified live.
+- Test lesson: the runner stub returned exitCode 1 for every exec, so the folder mkdir failed and "open" never arrived. Fixed in tests/workspace-config.test.ts (mkdir succeeds, AGENTS.md probe fails).
+- Overlap: chat "Load AGENTS.md" and workspace "Load AGENTS.md" insert the same block; the text keeps one copy per source, so a chat can hold it twice. Known, documented.

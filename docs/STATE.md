@@ -1,9 +1,11 @@
 # STATE (handoff)
 
 ## Current task
-Settings pages (user m01522): DONE, on prod at 908b2df. Browser click-through still pending (user sign-in).
+Workspace defaults (user m01601): DONE in code, commit fc4efe4, suite 131/131. Not yet on prod (user m01536: push to prod after testing). Browser click-through pending (user sign-in).
+Known gaps: chat view shows no note that a folder overrides the global settings; MCP off per folder is accepted by configure but tool list effect not verified live (no model call).
 
 ## Done recently
+- Workspace defaults (fc4efe4): src/workspace-config.ts (<DATA_DIR>/workspace-config.json; checkWorkspaceConfig, resolveSettings); applyChat in src/server.ts; harness applySettings options {instructions,cwd,disabledMcp}; dialog #wsdlg in public/index.html. Tests: tests/workspace-config.test.ts (9).
 - Settings: "Settings" button in #top opens #globaldlg (model/limit/max rounds, Anthropic key, MCP servers). Each folder row has a gear button (.folder-gear) that opens #wsdlg for /workspace/<folder>: workspace instructions, "Load AGENTS.md from folder".
 - Workspace instructions: src/workspace-settings.ts (<DATA_DIR>/workspace-instructions.json). Effective chat instructions = workspace text, then chat text (combineInstructions). src/server.ts effectiveInstructions(); applyFolder() re-applies to every chat in the folder on save/load.
 - WS: workspace-get / workspace-save / workspace-load-agents -> reply "workspace" {folder, instructions, chats}. Folder must be one a chat uses.
