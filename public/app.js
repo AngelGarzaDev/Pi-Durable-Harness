@@ -2,7 +2,7 @@
 import { reviewLine, isReviewContinuation } from "./review-view.js";
 import { answerMessage, questionHint } from "./ask-view.js";
 import { renderMarkdown, enhanceCode } from "./markdown-view.js";
-import { orderChats } from "./chat-order.js";
+import { groupByFolder } from "./chat-order.js";
 const ws = new WebSocket(`ws://${location.host}/ws`);
 const out = document.getElementById("transcript");
 const status = document.getElementById("status");
@@ -136,15 +136,40 @@ function render(entries) {
 	out.scrollTop = out.scrollHeight;
 }
 
+// Folders the person has collapsed in the sidebar (kept in this browser only).
+const collapsedKey = "pdw-collapsed-folders";
+let collapsed = new Set(JSON.parse(localStorage.getItem(collapsedKey) ?? "[]"));
+let lastChats = [];
 function renderChats(chats) {
+	if (chats) lastChats = chats;
 	chatList.textContent = "";
-	for (const [c, child] of orderChats(chats)) {
-		const b = document.createElement("button");
-		b.className = "chat" + (child ? " child" : "") + (c.id === openId ? " active" : "");
-		b.textContent = (child ? "↳ " : "") + c.title;
-		b.title = c.title;
-		b.onclick = () => ws.send(JSON.stringify({ type: "open", conversationId: c.id }));
-		chatList.appendChild(b);
+	for (const group of groupByFolder(lastChats)) {
+		const hasFolder = group.folder !== "";
+		const isCollapsed = hasFolder && collapsed.has(group.folder);
+		if (hasFolder) {
+			const h = document.createElement("button");
+			h.type = "button";
+			h.className = "folder";
+			h.setAttribute("aria-expanded", String(!isCollapsed));
+			h.textContent = (isCollapsed ? "▸ " : "▾ ") + group.folder;
+			h.title = "/workspace/" + group.folder + " · " + group.chats.length + " chat(s)";
+			h.onclick = () => {
+				if (collapsed.has(group.folder)) collapsed.delete(group.folder);
+				else collapsed.add(group.folder);
+				localStorage.setItem(collapsedKey, JSON.stringify([...collapsed]));
+				renderChats();
+			};
+			chatList.appendChild(h);
+		}
+		if (isCollapsed) continue;
+		for (const [c, child] of group.chats) {
+			const b = document.createElement("button");
+			b.className = "chat" + (child ? " child" : "") + (c.id === openId ? " active" : "") + (hasFolder ? " in-folder" : "");
+			b.textContent = (child ? "↳ " : "") + c.title;
+			b.title = c.title;
+			b.onclick = () => ws.send(JSON.stringify({ type: "open", conversationId: c.id }));
+			chatList.appendChild(b);
+		}
 	}
 }
 
@@ -173,6 +198,8 @@ ws.onmessage = (e) => {
 		settingsMsg.textContent = msg.on ? "Review is on for this chat." : "Review is off for this chat.";
 	} else if (msg.type === "open") {
 		openId = msg.conversationId;
+		// Opening a chat in a collapsed folder shows that folder, so the open chat is never hidden.
+		if (msg.folder && collapsed.delete(msg.folder)) localStorage.setItem(collapsedKey, JSON.stringify([...collapsed]));
 		titleEl.textContent = msg.title;
 		instrText.value = msg.instructions ?? "";
 		instrMsg.textContent = "";

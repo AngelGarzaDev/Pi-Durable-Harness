@@ -38,6 +38,9 @@ button.linkish:hover { color: var(--text); background: none; }
 #chatlist { display: flex; flex-direction: column; gap: 2px; margin-top: .5rem; }
 #chats button.chat { display: block; width: 100%; text-align: left; padding: .45rem .6rem; border: 1px solid transparent; background: none; color: #c3c8d4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #chats button.chat:hover:not(:disabled) { background: var(--panel-2); border-color: transparent; color: var(--text); }
+#chats button.folder { display: flex; align-items: center; width: 100%; text-align: left; padding: .4rem .5rem; margin-top: .3rem; border: 0; background: none; color: var(--muted); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#chats button.folder:hover:not(:disabled) { color: var(--text); background: var(--panel-2); border-color: transparent; }
+#chats button.chat.in-folder { padding-left: 1.25rem; }
 #chats button.chat.child { padding-left: 1.5rem; font-size: .9rem; color: var(--muted); }
 #chats button.chat.active { background: var(--panel-2); border-color: var(--border); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
 

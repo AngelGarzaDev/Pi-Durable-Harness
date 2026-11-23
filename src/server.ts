@@ -164,12 +164,13 @@ async function allConversations(): Promise<ConversationRecord[]> {
 }
 
 // All chats in the harness, with titles and the fork parent. The root chat is listed too.
-async function chatList(): Promise<{ type: "chats"; chats: { id: number; title: string; parentId?: number }[] }> {
+async function chatList(): Promise<{ type: "chats"; chats: { id: number; title: string; parentId?: number; folder: string }[] }> {
 	const records = await allConversations();
 	const chats = records.map((r) => ({
 		id: r.id,
 		title: titles[String(r.id)] ?? (r.id === root.id ? "Main chat" : "Chat"),
 		parentId: r.parent?.conversationId,
+		folder: chatFolders[String(r.id)] ?? "",
 	}));
 	return { type: "chats", chats };
 }

@@ -19,3 +19,20 @@ export function orderChats(chats) {
 	for (const r of roots) walk(r, false);
 	return out;
 }
+
+// Sidebar groups: one group per folder, then the chats with no folder. Folders are ordered by their newest chat
+// (newest first); the no-folder group comes last. Within a group, orderChats applies (forks under their parent).
+// A chat's folder is c.folder ("" or missing = no folder). Forks share their parent's folder, so they stay together.
+export const NO_FOLDER = "";
+export function groupByFolder(chats) {
+	const groups = new Map();
+	for (const c of chats) {
+		const key = c.folder || NO_FOLDER;
+		if (!groups.has(key)) groups.set(key, []);
+		groups.get(key).push(c);
+	}
+	const newest = (list) => Math.max(...list.map((c) => c.id));
+	return [...groups.entries()]
+		.sort(([ka, la], [kb, lb]) => (ka === NO_FOLDER) - (kb === NO_FOLDER) || newest(lb) - newest(la))
+		.map(([folder, list]) => ({ folder, chats: orderChats(list) }));
+}

@@ -227,3 +227,10 @@
 - Dev live check (no model call): folder with 2-line AGENTS.md, new chat, open message carried the block exactly. Test folder removed from the dev workspace afterwards.
 - Prod NOT redeployed for step 3 (AGENTS.md: prod changes need the user's request).
 - 2026-11-23 production deploy 0a61619 (user m01391, step 3). Backup deploy/production/backup/app-data-pre-step3-2026-11-23.tgz (98 KB, stream tar). deploy.sh healthy at 8790; healthz ok; read-only WS list answered (4 titled chats in chats.json, same titles as the backup). No chat created, no model call, no folder changed on prod.
+
+## 2026-11-23 Sidebar grouped by folder (user m01407)
+- chat-order.js groupByFolder(chats): one group per folder, folders by newest chat id, no-folder chats last. Forks stay under their parent in the same group (orderChats).
+- chatList (src/server.ts) now sends folder ("" = none) with each chat.
+- public/app.js renderChats: folder header button ("▾ name" / "▸ name", aria-expanded), click collapses/expands. Collapsed set in localStorage key pdw-collapsed-folders (this browser only). Opening a chat in a collapsed folder expands it.
+- Tests: 3 new groupByFolder tests in tests/chat-order.test.ts. Suite 111/111.
+- Not browser-checked: needs sign-in by the user (token is not put in tool calls).

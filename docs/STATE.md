@@ -11,11 +11,12 @@ Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructi
 
 ## Next steps
 1. Browser check of the instructions box and folder box on dev (sign in in the browser only).
-2. Browser click-through of instructions, folder and Load AGENTS.md boxes (needs user sign-in).
+2. Sidebar grouped by folder built and tested (commit below), not yet deployed; browser check pending.
+3. Browser click-through of instructions, folder and Load AGENTS.md boxes (needs user sign-in).
 4. Life-manager prompt: waiting on user (what to manage, m01158).
 
 ## How to test
-- npm run typecheck && npm test (108 passing).
+- npm run typecheck && npm test (111 passing).
 - Dev: docker compose up -d --build; curl -s http://127.0.0.1:8787/healthz → ok.
 
 ## Known gaps
