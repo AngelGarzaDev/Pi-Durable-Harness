@@ -248,3 +248,9 @@
 - Button is not nested in the toggle button (invalid HTML).
 - Suite 114/114. Not browser-checked (needs sign-in).
 - 2026-11-23 production deploy 8fb7f51 (user m01493, "+" per workspace). Backup deploy/production/backup/app-data-pre-plus-2026-11-23.tgz (206 KB). deploy.sh healthy at 8790; healthz ok; prod serves the new app.js. No model call, no chat changed.
+
+## 2026-11-23 AGENTS.md, long workflows and compaction (user m01499, answered by reading pi-durable 1.6.0)
+- A chat's instructions are stored in its agent state (pi.agent), not in the transcript. dist/harness/agent.js:253-256 renders them each request as the reserved section "instructions" (after all other sections).
+- Compaction summarizes transcript messages only (compaction.js summarizedMessages; system messages are omitted from the summarizer prompt). So the instructions are never summarized away and survive compaction, reset-free. Cost: they use context on every request (max 8000 chars, roughly 2k tokens).
+- Compaction focus can be given with compact(instructions) (README "Compaction"), but the app does not pass AGENTS text there; the summarizer does not see it.
+- Our AGENTS copy is taken at creation or on "Load AGENTS.md"; later edits to the folder file (including by the model) do not reach the chat until reloaded.
