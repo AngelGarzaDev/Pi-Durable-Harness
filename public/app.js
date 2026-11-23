@@ -164,11 +164,18 @@ function renderChats(chats) {
 			const plus = document.createElement("button");
 			plus.type = "button";
 			plus.className = "folder-plus";
+			const gear = document.createElement("button");
+			gear.type = "button";
+			gear.className = "folder-plus folder-gear";
+			gear.textContent = "\u2699";
+			gear.title = "Settings for /workspace/" + group.folder;
+			gear.setAttribute("aria-label", "Settings for " + group.folder);
+			gear.onclick = () => openWorkspace(group.folder);
 			plus.textContent = "+";
 			plus.title = "New chat in /workspace/" + group.folder;
 			plus.setAttribute("aria-label", "New chat in " + group.folder);
 			plus.onclick = () => ws.send(JSON.stringify({ type: "new", folder: group.folder }));
-			row.append(h, plus);
+			row.append(h, gear, plus);
 			chatList.appendChild(row);
 		}
 		if (isCollapsed) continue;
@@ -225,10 +232,12 @@ ws.onmessage = (e) => {
 		keyMsg.textContent = msg.message;
 		mcpMsg.textContent = msg.message;
 		instrMsg.textContent = msg.message;
+		if (wsdlg.open) wsMsg.textContent = msg.message;
 	} else if (msg.type === "chat-instructions") {
 		instrText.value = msg.instructions ?? "";
 		instrMsg.textContent = msg.instructions ? "Saved. Applies from the next request." : "Cleared for this chat.";
-	} else if (msg.type === "settings") showSettings(msg);
+	} else if (msg.type === "workspace") showWorkspace(msg);
+	else if (msg.type === "settings") showSettings(msg);
 	else if (msg.type === "auth") showKey(msg.anthropic);
 	else if (msg.type === "mcp") showMcp(msg);
 };
@@ -278,6 +287,41 @@ const modelSelect = document.getElementById("model");
 const limitInput = document.getElementById("limit");
 const maxTurnsInput = document.getElementById("maxturns");
 const settingsMsg = document.getElementById("settings-msg");
+
+// Global settings dialog.
+const globalDlg = document.getElementById("globaldlg");
+document.getElementById("globalbtn").onclick = () => globalDlg.showModal();
+document.getElementById("globalclose").onclick = () => globalDlg.close();
+
+// Workspace settings dialog: one per /workspace/<folder>, opened from the folder's gear button.
+const wsdlg = document.getElementById("wsdlg");
+const wsTitle = document.getElementById("wstitle");
+const wsText = document.getElementById("wstext");
+const wsMsg = document.getElementById("wsmsg");
+let wsFolder = "";
+function openWorkspace(folder) {
+	wsFolder = folder;
+	wsTitle.textContent = "Workspace /workspace/" + folder;
+	wsText.value = "";
+	wsMsg.textContent = "Loading…";
+	wsdlg.showModal();
+	ws.send(JSON.stringify({ type: "workspace-get", folder }));
+}
+function showWorkspace(msg) {
+	if (msg.folder !== wsFolder) return;
+	wsText.value = msg.instructions ?? "";
+	wsMsg.textContent = msg.chats + " chat(s) use this workspace.";
+}
+document.getElementById("wsclose").onclick = () => wsdlg.close();
+document.getElementById("wsform").onsubmit = (e) => {
+	e.preventDefault();
+	wsMsg.textContent = "Saving…";
+	ws.send(JSON.stringify({ type: "workspace-save", folder: wsFolder, text: wsText.value }));
+};
+document.getElementById("wsloadagents").onclick = () => {
+	wsMsg.textContent = "Loading AGENTS.md…";
+	ws.send(JSON.stringify({ type: "workspace-load-agents", folder: wsFolder }));
+};
 let current = null;
 function showSettings(msg) {
 	current = msg;

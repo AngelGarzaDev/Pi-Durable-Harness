@@ -42,6 +42,10 @@ button.linkish:hover { color: var(--text); background: none; }
 #chats .folder-row { display: flex; align-items: center; gap: .2rem; margin-top: .3rem; }
 #chats .folder-row button.folder { flex: 1; min-width: 0; margin-top: 0; }
 #chats button.folder-plus { flex: 0 0 auto; width: 1.7rem; height: 1.7rem; padding: 0; line-height: 1; font-size: 1.1rem; border: 1px solid transparent; background: none; color: var(--muted); }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 10px; width: min(48rem, 92vw); max-height: 88vh; }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
+dialog textarea { width: 100%; box-sizing: border-box; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: .5rem .6rem; font: inherit; }
 #chats button.folder-plus:hover:not(:disabled) { color: var(--text); background: var(--panel-2); border-color: var(--border); }
 #chats button.folder:hover:not(:disabled) { color: var(--text); background: var(--panel-2); border-color: transparent; }
 #chats button.chat.in-folder { padding-left: 1.25rem; }
@@ -150,6 +154,15 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
   #transcript { min-height: 50vh; }
 }
 </style>
+<dialog id="wsdlg">
+  <h2 id="wstitle">Workspace</h2>
+  <p class="muted">Instructions for every chat in this workspace. They go before each chat's own instructions and apply from the next request.</p>
+  <form id="wsform">
+    <textarea id="wstext" rows="6" maxlength="8000" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="Instructions for this workspace (optional)."></textarea>
+    <div class="row"><button type="submit">Save</button> <button type="button" id="wsloadagents" title="Copies AGENTS.md from this workspace folder into the box above, replacing an earlier copy.">Load AGENTS.md from folder</button> <span id="wsmsg"></span></div>
+  </form>
+  <p><button type="button" id="wsclose">Close</button></p>
+</dialog>
 <aside id="chats">
   <h2>Chats</h2>
   <input id="newfolder" type="text" maxlength="64" placeholder="Folder (optional)" title="Folder under /workspace for this chat. Fixed once the chat is created.">
@@ -160,21 +173,18 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
 <div id="main">
   <div id="top">
     <h1 id="title">Pi Durable</h1>
+    <button type="button" id="globalbtn">Settings</button>
     <span id="status">connecting… · <button id="logout" type="button" class="linkish">sign out</button></span>
   </div>
+  <dialog id="globaldlg">
+  <h2>Global settings</h2>
+  <p class="muted">These apply to every chat. Workspace settings are on each workspace's gear button.</p>
   <form id="settings">
     <label>Model <select id="model"></select></label>
     <label>Compact at <input id="limit" type="number" step="1000"> tokens</label>
     <label>Max tool rounds <input id="maxturns" type="number" min="1" step="1" style="width:6rem"></label>
     <button type="submit">Apply</button> <span id="settings-msg"></span>
   </form>
-  <details id="instr">
-    <summary>Chat instructions</summary>
-    <form id="instrform">
-      <textarea id="instrtext" rows="3" autocomplete="off" data-form-type="other" data-lpignore="true" maxlength="8000" placeholder="Extra instructions for this chat only (optional). They are added after the base rules and apply from the next request."></textarea>
-      <div class="row"><button type="submit">Save instructions</button> <button type="button" id="loadagents" disabled title="Copies AGENTS.md from this chat's folder into the box above, replacing an earlier copy. Chats without a folder have none.">Load AGENTS.md from folder</button> <span id="instrmsg"></span></div>
-    </form>
-  </details>
   <form id="keyform" class="keyrow">
     <span>Anthropic key: <span id="keysource">checking…</span></span>
     <input id="keyinput" type="password" autocomplete="off" placeholder="sk-ant-… (stored in this app's data, never shown again)">
@@ -193,6 +203,15 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
       <button type="submit" id="mcpsubmit" title="Local programs run inside the runner, which has no credentials. Remote URLs are reached from the app.">Add server</button>
       <button type="button" id="mcpcancel" hidden>Cancel edit</button>
       <span id="mcpmsg"></span>
+    </form>
+  </details>
+  <p><button type="button" id="globalclose">Close</button></p>
+  </dialog>
+  <details id="instr">
+    <summary>Chat instructions</summary>
+    <form id="instrform">
+      <textarea id="instrtext" rows="3" autocomplete="off" data-form-type="other" data-lpignore="true" maxlength="8000" placeholder="Extra instructions for this chat only (optional). They are added after the base rules and apply from the next request."></textarea>
+      <div class="row"><button type="submit">Save instructions</button> <button type="button" id="loadagents" disabled title="Copies AGENTS.md from this chat's folder into the box above, replacing an earlier copy. Chats without a folder have none.">Load AGENTS.md from folder</button> <span id="instrmsg"></span></div>
     </form>
   </details>
   <div id="notice" class="notice" hidden></div>

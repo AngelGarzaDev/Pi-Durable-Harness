@@ -16,6 +16,7 @@ import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./
 import { mergeAgentsMd, readFolderAgents } from "./agents-md.js";
 import { WORKSPACE_ROOT, checkFolderName, folderPath, loadChatFolders, saveChatFolders, type ChatFolders } from "./chat-folder.js";
 import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
+import { checkWorkspaceInstructions, combineInstructions, loadWorkspaceInstructions, saveWorkspaceInstructions, type WorkspaceInstructions } from "./workspace-settings.js";
 import { readMcpConfig } from "./mcp-config.js";
 import { LoginLimiter, SECURITY_HEADERS, errorRef, originAllowed } from "./guard.js";
 
@@ -31,6 +32,10 @@ type ClientMessage =
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
 	| { type: "chat-instructions"; text: string }
 	| { type: "load-agents" }
+	// Workspace (folder) settings: instructions for every chat in that folder. The folder must be one a chat uses.
+	| { type: "workspace-get"; folder: string }
+	| { type: "workspace-save"; folder: string; text: string }
+	| { type: "workspace-load-agents"; folder: string }
 	| { type: "review"; on?: boolean; reviewerModel?: string }
 	// An answer to a question the model asked (ask_user). taskId and key must match a question shown in the open chat.
 	| { type: "answer"; taskId: number; key: string; text: string }
@@ -53,7 +58,14 @@ let settings: ChatSettings = initialSettings;
 const titles: Titles = loadTitles(config.dataDir);
 const chatInstructions: ChatInstructions = loadChatInstructions(config.dataDir);
 const chatFolders: ChatFolders = loadChatFolders(config.dataDir);
-if (chatInstructions[String(root.id)]) await applySettings(root, models, settings, chatInstructions[String(root.id)]);
+const workspaceInstructions: WorkspaceInstructions = loadWorkspaceInstructions(config.dataDir);
+// What the model gets for a chat: its folder's workspace instructions, then the chat's own.
+function effectiveInstructions(id: unknown): string {
+	const key = String(id);
+	const folder = chatFolders[key];
+	return combineInstructions(folder ? workspaceInstructions[folder] : undefined, chatInstructions[key]);
+}
+if (effectiveInstructions(root.id)) await applySettings(root, models, settings, effectiveInstructions(root.id));
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css" };
 // Only these files are served. Nothing else under public/ is reachable.
@@ -195,12 +207,21 @@ async function makeFolder(name: string): Promise<boolean> {
 	}
 }
 
+// Re-applies instructions to every chat in one folder (after its workspace instructions change).
+async function applyFolder(folder: string) {
+	for (const [id, f] of Object.entries(chatFolders)) {
+		if (f !== folder) continue;
+		const conv = await harness.conversation(id as unknown as ConversationId, context);
+		if (conv) await applySettings(conv, models, settings, effectiveInstructions(id), folderPath(folder));
+	}
+}
+
 // Applies the saved settings to every chat, so a model or limit change covers all of them.
 async function applyToAll(next: ChatSettings) {
 	const records = await allConversations();
 	for (const r of records) {
 		const conv = await harness.conversation(r.id, context);
-		if (conv) await applySettings(conv, models, next, chatInstructions[String(r.id)], chatFolders[String(r.id)] ? folderPath(chatFolders[String(r.id)]) : undefined);
+		if (conv) await applySettings(conv, models, next, effectiveInstructions(r.id), chatFolders[String(r.id)] ? folderPath(chatFolders[String(r.id)]) : undefined);
 	}
 }
 
@@ -275,7 +296,7 @@ wss.on("connection", async (socket: WebSocket) => {
 					chatFolders[String(fork.id)] = chatFolders[String(active.id)];
 					saveChatFolders(config.dataDir, chatFolders);
 				}
-				await applySettings(fork, models, settings, chatInstructions[String(fork.id)], chatFolders[String(fork.id)] ? folderPath(chatFolders[String(fork.id)]) : undefined);
+				await applySettings(fork, models, settings, effectiveInstructions(fork.id), chatFolders[String(fork.id)] ? folderPath(chatFolders[String(fork.id)]) : undefined);
 				await openChat(fork);
 				send(await chatList());
 			} else if (msg.type === "new") {
@@ -306,7 +327,7 @@ wss.on("connection", async (socket: WebSocket) => {
 					chatInstructions[String(conv.id)] = merged;
 					saveChatInstructions(config.dataDir, chatInstructions);
 				}
-				await applySettings(conv, models, settings, chatInstructions[String(conv.id)], folder ? folderPath(folder) : undefined);
+				await applySettings(conv, models, settings, effectiveInstructions(conv.id), folder ? folderPath(folder) : undefined);
 				await openChat(conv);
 				send(await chatList());
 			} else if (msg.type === "open") {
@@ -336,7 +357,7 @@ wss.on("connection", async (socket: WebSocket) => {
 				if (text) chatInstructions[key] = text;
 				else delete chatInstructions[key];
 				saveChatInstructions(config.dataDir, chatInstructions);
-				await applySettings(active, models, settings, text);
+				await applySettings(active, models, settings, effectiveInstructions(active.id));
 				send({ type: "chat-instructions", conversationId: active.id, instructions: text });
 			} else if (msg.type === "load-agents") {
 				// Copies the active chat's folder AGENTS.md into its instructions box (replacing an earlier copy of it).
@@ -350,8 +371,33 @@ wss.on("connection", async (socket: WebSocket) => {
 				if (problem) return send({ type: "error", message: `Not loaded: ${problem}` });
 				chatInstructions[String(active.id)] = text;
 				saveChatInstructions(config.dataDir, chatInstructions);
-				await applySettings(active, models, settings, text, folderPath(folder));
+				await applySettings(active, models, settings, effectiveInstructions(active.id), folderPath(folder));
 				send({ type: "chat-instructions", conversationId: active.id, instructions: text });
+			} else if (msg.type === "workspace-get" || msg.type === "workspace-save" || msg.type === "workspace-load-agents") {
+				const folder = typeof msg.folder === "string" ? msg.folder : "";
+				if (!Object.values(chatFolders).includes(folder)) return send({ type: "error", message: "No chat uses that folder." });
+				if (msg.type === "workspace-save") {
+					const text = "text" in msg && typeof msg.text === "string" ? msg.text : undefined;
+					const problem = checkWorkspaceInstructions(text);
+					if (problem) return send({ type: "error", message: problem });
+					const trimmed = (text as string).trim();
+					if (trimmed) workspaceInstructions[folder] = trimmed;
+					else delete workspaceInstructions[folder];
+					saveWorkspaceInstructions(config.dataDir, workspaceInstructions);
+					await applyFolder(folder);
+				} else if (msg.type === "workspace-load-agents") {
+					const read = await readAgents(folder);
+					if ("error" in read) return send({ type: "error", message: read.error });
+					if (!read.found) return send({ type: "error", message: "No AGENTS.md in that folder." });
+					const text = mergeAgentsMd(workspaceInstructions[folder] ?? "", read.text);
+					const problem = checkWorkspaceInstructions(text);
+					if (problem) return send({ type: "error", message: `Not loaded: ${problem}` });
+					workspaceInstructions[folder] = text;
+					saveWorkspaceInstructions(config.dataDir, workspaceInstructions);
+					await applyFolder(folder);
+				}
+				const chats = Object.values(chatFolders).filter((f) => f === folder).length;
+				send({ type: "workspace", folder, instructions: workspaceInstructions[folder] ?? "", chats });
 			} else if (msg.type === "review") {
 				// Answer review for this chat only. Takes effect on the next answer.
 				const patch: { on?: boolean; reviewerModel?: string | null } = {};

@@ -254,3 +254,12 @@
 - Compaction summarizes transcript messages only (compaction.js summarizedMessages; system messages are omitted from the summarizer prompt). So the instructions are never summarized away and survive compaction, reset-free. Cost: they use context on every request (max 8000 chars, roughly 2k tokens).
 - Compaction focus can be given with compact(instructions) (README "Compaction"), but the app does not pass AGENTS text there; the summarizer does not see it.
 - Our AGENTS copy is taken at creation or on "Load AGENTS.md"; later edits to the folder file (including by the model) do not reach the chat until reloaded.
+
+## 2026-11-23 Settings pages (user m01522)
+- Global settings (model, compact limit, max rounds, Anthropic key, MCP) moved into a <dialog> behind a "Settings" button in #top. Element ids unchanged, so the existing JS is untouched.
+- Workspace settings live in a <dialog> opened by a gear button on each folder row, next to "+". Chosen over a page (no router in the app) and over a sidebar pane (keeps the chat view the same).
+- Workspace instructions are stored per folder in <DATA_DIR>/workspace-instructions.json, not per chat, so one edit covers every chat in the folder. They go first; the chat's own text follows. Reason: the workspace rules should be the base, and a chat can add to them.
+- Saving or loading AGENTS.md at workspace level re-applies the instructions to every chat in that folder (applyFolder), so the change takes effect from the next request without reopening chats.
+- Overlap: chat "Load AGENTS.md" (step 3) and workspace "Load AGENTS.md" both copy the same block. Each box keeps one copy, but a chat with both gets the file's text twice. Left as is; the chat box shows exactly what is sent.
+- workspace-get/save/load only accept a folder that some chat uses. Reason: avoids creating settings for arbitrary names; folder names are already checked by checkFolderName.
+- Test: tests/workspace-settings.test.ts (8: combine order, storage, limit, WS get/save/clear/too-long/load/no-file). Browser check not done by the agent (needs user sign-in; token not used in tool calls).

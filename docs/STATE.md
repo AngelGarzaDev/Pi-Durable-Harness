@@ -1,28 +1,28 @@
 # STATE (handoff)
 
 ## Current task
-Per-conversation workspace plan (user m01156/m01170). Step 1 (per-chat instructions, f05ab08) and step 2 (per-chat folder under /workspace, commit below) DONE. Step 3 (AGENTS.md from folder into instructions) DONE, on prod at 0a61619. Prod deployed 8fb7f51 (steps 1+2+3 + sidebar grouping + autofill off + per-folder +), healthy, backup deploy/production/backup/app-data-pre-step2-2026-11-23.tgz.
+Settings pages (user m01522): GLOBAL settings dialog and one WORKSPACE settings dialog per folder. DONE in code and tests, on dev (rebuilt, healthz ok). Commit and push pending when this file is saved; then prod deploy (user m01536: "once testing is complete, push to prod").
 
 ## Done recently
-- Step 2 per-chat folder: src/chat-folder.ts, harness env factory uses agent cwd, server "new" takes folder, mkdir on runner, UI folder box in sidebar. tests/chat-folder.test.ts. Dev live check: pwd in folder livecheck gave /workspace/livecheck.
-- Step 1 per-chat instructions: src/chat-instructions.ts, src/harness.ts applySettings(..., chatInstructions), src/server.ts chat-instructions message, public/index.html #instr box, public/app.js. Tests 95/95.
-- UI: markdown (55ef85e), restyle (378521f), chat list newest first (5185cc3), questions above composer (0cd84e0).
-- Goal 8 MCP servers complete. Production on 5185cc3 (last redeploy); prod has NOT got step 1 yet.
+- Settings: "Settings" button in #top opens #globaldlg (model/limit/max rounds, Anthropic key, MCP servers). Each folder row has a gear button (.folder-gear) that opens #wsdlg for /workspace/<folder>: workspace instructions, "Load AGENTS.md from folder".
+- Workspace instructions: src/workspace-settings.ts (<DATA_DIR>/workspace-instructions.json). Effective chat instructions = workspace text, then chat text (combineInstructions). src/server.ts effectiveInstructions(); applyFolder() re-applies to every chat in the folder on save/load.
+- WS: workspace-get / workspace-save / workspace-load-agents -> reply "workspace" {folder, instructions, chats}. Folder must be one a chat uses.
+- Tests: tests/workspace-settings.test.ts (8). Suite 122/122.
+- Earlier: per-chat instructions (step 1), per-chat folder (step 2), AGENTS.md copy (step 3), sidebar grouping, autofill off, "+" per folder.
 
 ## Next steps
-1. Browser check of the instructions box and folder box on dev (sign in in the browser only).
-2. Sidebar grouping on prod (06da1bc); browser check pending (needs user sign-in).
-4. Browser click-through of instructions, folder and Load AGENTS.md boxes (needs user sign-in).
-4. Life-manager prompt: DROPPED by user (m01458). Not pending.
+1. Commit + push origin main (AGENTS.md push recipe).
+2. Prod deploy: backup deploy/production/backup/app-data-pre-settings-<date>.tgz, deploy/production/deploy.sh, healthz on 127.0.0.1:8790.
+3. Browser click-through of Settings dialog and gear dialog on dev and prod (needs user sign-in; not done by agent).
 
 ## How to test
-- npm run typecheck && npm test (114 passing).
-- Dev: docker compose up -d --build; curl -s http://127.0.0.1:8787/healthz → ok.
+- npm run typecheck && npm test (122 passing).
+- Dev: docker compose up -d --build; curl -s http://127.0.0.1:8787/healthz -> ok. curl to 8787 returns 302 (login), so check served files via docker compose exec -T app grep.
 
 ## Known gaps
-- Browser click-through not done for goal 6/7/8 UI, restyle, chat order, or the new instructions box.
-- Goal 5.2 (second real user check): PARKED by user (m01458), needs a second account. Revisit later.
+- Browser click-through not done for: settings dialogs, gear, "+", autofill, instructions and folder boxes, restyle, chat order.
+- Chat "Load AGENTS.md" and workspace "Load AGENTS.md" insert the same block; a chat that has both gets it twice (documented in NOTES).
+- Goal 5.2 (second real user check): PARKED (m01458).
 
 ## Needs you
-- Test chats/files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt, /workspace/mcp-live) — do not delete without approval.
-- Prod on f3fa285 (steps 1+2). Browser check of new boxes on prod not done (needs sign-in by user).
+- Test chats/files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt, /workspace/mcp-live): do not delete without approval.
