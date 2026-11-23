@@ -1,7 +1,7 @@
 # STATE (handoff)
 
 ## Current task
-Goal 9 (user m01778, option 1): single source for workspace rules. DONE, committed 3090ef5, pushed origin main. Dev rebuilt (healthz ok). PROD NOT DEPLOYED: ask user first.
+Goal 9 (user m01778, option 1): single source for workspace rules. DONE. Committed 3090ef5, deployed to prod a1c0cf6 (backup app-data-pre-goal9-2026-11-23.tgz), healthz ok on 8790 and 8787.
 
 ## Done recently
 - Goal 9 (3090ef5): src/folder-rules.ts (FolderRules, legacy migration); src/agents-md.ts (combineInstructions, stripLegacyBlock); src/workspace-settings.ts deleted; src/server.ts reads AGENTS.md before each submit in a folder; UI: workspace dialog edits AGENTS.md only, both Load AGENTS.md buttons removed (public/index.html, public/app.js). Tests: tests/folder-rules.test.ts (new), tests/chat-folder.test.ts (copy tests replaced), tests/workspace-settings.test.ts deleted.
@@ -10,7 +10,7 @@ Goal 9 (user m01778, option 1): single source for workspace rules. DONE, committ
 
 ## Next steps
 1. Done: committed 3090ef5, pushed (askpass script in /tmp using secrets/github_repo_api_key, deleted after).
-2. Ask user: deploy goal 9 to prod (docker compose -f deploy/production/compose.yaml up -d --build, backup first). Dev rebuild is allowed.
+2. Done: prod deployed a1c0cf6. Open question: cost of two runner calls per folder message (see NOTES).
 3. Browser click-through of dialogs (needs user sign-in).
 
 ## How to test
