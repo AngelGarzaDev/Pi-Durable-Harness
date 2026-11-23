@@ -241,3 +241,4 @@
 - public/index.html: #msg, form #f and #instrtext get autocomplete="off" (plus data-form-type="other" and data-lpignore="true" for password managers). #msg has no name attribute, since browsers key autofill history on it.
 - Browsers may still keep history for fields they consider "address-like"; autocomplete="off" is the standard request, and Chrome/Firefox generally honour it for typed-text history. Not verified in a browser (needs sign-in); check after the next visit.
 - Tests: tests/autofill-off.test.ts (3). Suite 114/114.
+- 2026-11-23 production deploy c190f7c (user m01477, autofill off). Backup deploy/production/backup/app-data-pre-autofill-2026-11-23.tgz (206 KB). deploy.sh healthy at 8790; healthz ok; prod serves the new index.html. No model call, no chat changed.
