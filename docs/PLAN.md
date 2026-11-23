@@ -56,3 +56,11 @@ Architecture follows Pi: client library @earendil-works/pi-mcp@1.6.0 (pinned exa
 - [x] 8.4 WS messages `mcp-list`, `mcp-add`, `mcp-remove`, `mcp-reconnect` with status (state, tool count, error). Browser panel to list/add/remove.
 - [x] 8.5 Live check: one stdio fixture server (no internet needed) then a haiku call that uses its tool (dev only, haiku-5-5, 100000 limit). Log in NOTES.md.
 - [x] 8.6 Not in first pass (record in NOTES): OAuth for remote servers, deferred/codemode exposure, project-level config, /login-style MCP sign-in.
+
+## Goal 9: Single source for workspace rules (started 2026-11-23, user decision m01778: option 1)
+Rules for a folder = its AGENTS.md file only. Remove the workspace-instructions box/store and the "Load AGENTS.md" copy buttons.
+Chat box stays for per-chat notes. Model gets: AGENTS.md text, then chat text.
+- [ ] 9.1 src/folder-rules.ts: FolderRules (last-read text per folder, refresh() re-reads AGENTS.md, one-time migration of legacy workspace-instructions.json text into AGENTS.md). Tests: tests/folder-rules.test.ts (fake deps). Files: src/agents-md.ts (combineInstructions, stripLegacyBlock), delete src/workspace-settings.ts.
+- [ ] 9.2 server: refresh before each submit in a folder and when a folder's rules change (applyFolder); new chat reads rules; open message carries modelInstructions (resolved agent instructions) so tests can see what the model gets; startup strips old copied AGENTS block from chat-instructions.json. Remove workspace-get/save/load-agents and load-agents handlers.
+- [ ] 9.3 Browser: workspace dialog edits AGENTS.md (workspace-agents-get/save); remove wsLoad and chat loadagents buttons.
+- [ ] 9.4 Tests: replace tests/workspace-settings.test.ts and the copy tests in tests/chat-folder.test.ts with equivalents (reason in NOTES). Suite green. Commit, push origin. Prod deploy only after asking.
