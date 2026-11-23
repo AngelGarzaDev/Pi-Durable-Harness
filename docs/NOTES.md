@@ -234,3 +234,4 @@
 - public/app.js renderChats: folder header button ("▾ name" / "▸ name", aria-expanded), click collapses/expands. Collapsed set in localStorage key pdw-collapsed-folders (this browser only). Opening a chat in a collapsed folder expands it.
 - Tests: 3 new groupByFolder tests in tests/chat-order.test.ts. Suite 111/111.
 - Not browser-checked: needs sign-in by the user (token is not put in tool calls).
+- 2026-11-23 production deploy 06da1bc (user m01441, sidebar grouped by folder). Backup deploy/production/backup/app-data-pre-sidebar-2026-11-23.tgz (709 KB). deploy.sh healthy at 8790; healthz ok; prod serves the new app.js (groupByFolder present). No chat or folder changed on prod; no model call.
