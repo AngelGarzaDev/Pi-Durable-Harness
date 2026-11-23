@@ -33,6 +33,7 @@ type ClientMessage =
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
 	| { type: "chat-instructions"; text: string }
 	// Workspace (folder) settings. The folder's rules are its AGENTS.md; the folder must be one a chat uses.
+	| { type: "workspace-get"; folder: string }
 	| { type: "workspace-config"; folder: string; config: unknown }
 	| { type: "workspace-agents-get"; folder: string }
 	| { type: "workspace-agents-save"; folder: string; text: string }
@@ -445,6 +446,11 @@ wss.on("connection", async (socket: WebSocket) => {
 				folderRules.forgetLegacy(folder);
 				await applyFolder(folder);
 				send({ type: "workspace-agents", folder, found: true, text });
+			} else if (msg.type === "workspace-get") {
+				// Read-only: config, effective values and MCP servers for the dialog. Rules are read with workspace-agents-get.
+				const folder = typeof msg.folder === "string" ? msg.folder : "";
+				if (!Object.values(chatFolders).includes(folder)) return send({ type: "error", message: "No chat uses that folder." });
+				send(await workspaceReply(folder));
 			} else if (msg.type === "workspace-config") {
 				const folder = typeof msg.folder === "string" ? msg.folder : "";
 				if (!Object.values(chatFolders).includes(folder)) return send({ type: "error", message: "No chat uses that folder." });

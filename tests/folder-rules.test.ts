@@ -227,6 +227,15 @@ test("the rules shown in the dialog are the folder's AGENTS.md", async () => {
 	}
 });
 
+test("the workspace dialog gets its config and MCP list (workspace-get is answered)", async () => {
+	await ask({ type: "new", folder: "wsconfig" }, "open");
+	const got = await ask({ type: "workspace-get", folder: "wsconfig" }, "workspace");
+	assert.equal(got.folder, "wsconfig");
+	assert.equal(got.chats, 1);
+	assert.ok(Array.isArray(got.mcp));
+	assert.equal("instructions" in got, false);
+});
+
 test("saving the rules writes AGENTS.md in the folder and the model sees it on the next chat", async () => {
 	await ask({ type: "new", folder: "savedrules" }, "open");
 	const saved = await ask({ type: "workspace-agents-save", folder: "savedrules", text: "Use tabs.\n" }, "workspace-agents");
