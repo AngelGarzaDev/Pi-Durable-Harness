@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WebSocket } from "ws";
 import { checkFolderName, folderPath, loadChatFolders, saveChatFolders } from "../src/chat-folder.js";
+import { mergeAgentsMd } from "../src/agents-md.js";
 
 test("folder names: plain single names only", () => {
 	for (const ok of ["notes", "my-project", "a.b_c", "2026", "A1"]) assert.equal(checkFolderName(ok), undefined, ok);
@@ -32,6 +33,7 @@ let child: ChildProcess;
 let runner: Server;
 let runnerCalls: { command: unknown; cwd: unknown }[] = [];
 let runnerFail = false;
+let agentsText: string | null = null; // the folder's AGENTS.md on the stub runner; null = no file
 let cookie = "";
 let ws: WebSocket;
 let dataDir = "";
@@ -45,6 +47,14 @@ function runnerHandler(req: IncomingMessage, res: import("node:http").ServerResp
 		if (req.url === "/v1/exec") {
 			const parsed = JSON.parse(body);
 			runnerCalls.push({ command: parsed.command, cwd: parsed.options?.cwd });
+			const cmd = parsed.command as string[];
+			if (cmd[0] === "test" || cmd[0] === "head") {
+				res.writeHead(200, { "content-type": "application/x-ndjson" });
+				if (cmd[0] === "head" && agentsText !== null) res.write(JSON.stringify({ t: "out", text: agentsText, info: {} }) + "\n");
+				const exitCode = agentsText === null ? 1 : 0;
+				res.end(JSON.stringify({ t: "done", result: { ok: true, value: { exitCode } } }) + "\n");
+				return;
+			}
 			res.writeHead(200, { "content-type": "application/x-ndjson" });
 			res.end(JSON.stringify({ t: "done", result: runnerFail ? { ok: false, error: { name: "FileError", code: "io", message: "fail" } } : { ok: true, value: { exitCode: 0 } } }) + "\n");
 			return;
@@ -105,7 +115,7 @@ test("a new chat with a folder creates it on the runner and opens in it", async 
 	runnerCalls = [];
 	const opened = await ask({ type: "new", folder: "notes" }, "open");
 	assert.equal(opened.folder, "notes");
-	assert.deepEqual(runnerCalls.at(-1), { command: ["mkdir", "-p", "--", "notes"], cwd: "/workspace" });
+	assert.deepEqual(runnerCalls[0], { command: ["mkdir", "-p", "--", "notes"], cwd: "/workspace" }); // then the AGENTS.md probe, which is not a change
 	assert.deepEqual(loadChatFolders(join(dataDir, "data")), { [String(opened.conversationId)]: "notes" });
 });
 
@@ -135,4 +145,59 @@ test("a chat without a folder opens with none", async () => {
 
 test("the folder map on disk is what the app loaded", () => {
 	assert.ok(readFileSync(join(dataDir, "data", "chat-folders.json"), "utf8").includes("notes"));
+});
+
+// Step 3: a folder's AGENTS.md is copied into the chat's instructions box.
+test("a new chat in a folder with AGENTS.md takes that text into its instructions", async () => {
+	agentsText = "Use tabs.\nRun npm test.";
+	try {
+		const opened = await ask({ type: "new", folder: "withagents" }, "open");
+		assert.match(opened.instructions, /^--- AGENTS\.md from this chat's folder ---\nUse tabs\.\nRun npm test\.$/);
+	} finally {
+		agentsText = null;
+	}
+});
+
+test("a new chat in a folder without AGENTS.md has empty instructions", async () => {
+	agentsText = null;
+	const opened = await ask({ type: "new", folder: "noagents" }, "open");
+	assert.equal(opened.instructions, "");
+});
+
+test("load AGENTS.md keeps the person's own text and replaces an earlier copy", async () => {
+	agentsText = "version one";
+	try {
+		const opened = await ask({ type: "new", folder: "reload" }, "open");
+		assert.match(opened.instructions, /version one/);
+		await ask({ type: "chat-instructions", text: "My own note." }, "chat-instructions");
+		agentsText = "version two";
+		const reply = await ask({ type: "load-agents" }, "chat-instructions");
+		assert.equal(reply.instructions, "My own note.\n\n--- AGENTS.md from this chat's folder ---\nversion two");
+	} finally {
+		agentsText = null;
+	}
+});
+
+test("an AGENTS.md longer than the instructions limit is refused before a chat exists", async () => {
+	agentsText = "x".repeat(8001);
+	try {
+		const reply = await ask({ type: "new", folder: "toolong" }, "error");
+		assert.match(reply.message, /longer than 8000 characters/);
+	} finally {
+		agentsText = null;
+	}
+});
+
+test("load AGENTS.md in a chat without a folder is refused", async () => {
+	const opened = await ask({ type: "new" }, "open");
+	assert.equal(opened.folder, "");
+	const reply = await ask({ type: "load-agents" }, "error");
+	assert.equal(reply.message, "This chat has no folder.");
+});
+
+test("merge: replaces an earlier AGENTS.md block and keeps the person's own text first", () => {
+	assert.equal(mergeAgentsMd("", "rules"), "--- AGENTS.md from this chat's folder ---\nrules");
+	const once = mergeAgentsMd("own", "v1");
+	assert.equal(once, "own\n\n--- AGENTS.md from this chat's folder ---\nv1");
+	assert.equal(mergeAgentsMd(once, "v2"), "own\n\n--- AGENTS.md from this chat's folder ---\nv2");
 });

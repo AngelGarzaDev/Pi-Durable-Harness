@@ -165,7 +165,7 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     <summary>Chat instructions</summary>
     <form id="instrform">
       <textarea id="instrtext" rows="3" maxlength="8000" placeholder="Extra instructions for this chat only (optional). They are added after the base rules and apply from the next request."></textarea>
-      <div class="row"><button type="submit">Save instructions</button> <span id="instrmsg"></span></div>
+      <div class="row"><button type="submit">Save instructions</button> <button type="button" id="loadagents" disabled title="Copies AGENTS.md from this chat's folder into the box above, replacing an earlier copy. Chats without a folder have none.">Load AGENTS.md from folder</button> <span id="instrmsg"></span></div>
     </form>
   </details>
   <form id="keyform" class="keyrow">

@@ -13,6 +13,7 @@ import { RemoteExecutionEnv } from "./tools/remote-env.js";
 import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
+import { mergeAgentsMd, readFolderAgents } from "./agents-md.js";
 import { WORKSPACE_ROOT, checkFolderName, folderPath, loadChatFolders, saveChatFolders, type ChatFolders } from "./chat-folder.js";
 import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
 import { readMcpConfig } from "./mcp-config.js";
@@ -29,6 +30,7 @@ type ClientMessage =
 	| { type: "open"; conversationId: number }
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
 	| { type: "chat-instructions"; text: string }
+	| { type: "load-agents" }
 	| { type: "review"; on?: boolean; reviewerModel?: string }
 	// An answer to a question the model asked (ask_user). taskId and key must match a question shown in the open chat.
 	| { type: "answer"; taskId: number; key: string; text: string }
@@ -173,6 +175,15 @@ async function chatList(): Promise<{ type: "chats"; chats: { id: number; title: 
 }
 
 // Creates /workspace/<name> on the runner (mkdir -p). Returns false when the runner refuses or cannot be reached.
+async function readAgents(name: string) {
+	const env = new RemoteExecutionEnv(runnerUrl, runnerToken, WORKSPACE_ROOT);
+	try {
+		return await readFolderAgents(env, folderPath(name), context);
+	} catch {
+		return { error: "Could not reach the runner." } as const;
+	}
+}
+
 async function makeFolder(name: string): Promise<boolean> {
 	try {
 		const env = new RemoteExecutionEnv(runnerUrl, runnerToken, WORKSPACE_ROOT);
@@ -274,12 +285,25 @@ wss.on("connection", async (socket: WebSocket) => {
 					if (problem) return send({ type: "error", message: problem });
 					if (!(await makeFolder(folder))) return send({ type: "error", message: "Could not create that folder on the runner." });
 				}
+				// A folder's AGENTS.md is read before the chat exists, so a refusal leaves no chat behind.
+				let agentsText: string | undefined;
+				if (folder) {
+					const read = await readAgents(folder);
+					if ("error" in read) return send({ type: "error", message: read.error });
+					if (read.found) agentsText = read.text;
+				}
 				const conv = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
 				titles[String(conv.id)] = "Chat";
 				saveTitles(config.dataDir, titles);
 				if (folder) {
 					chatFolders[String(conv.id)] = folder;
 					saveChatFolders(config.dataDir, chatFolders);
+				}
+				if (agentsText !== undefined) {
+					const merged = mergeAgentsMd("", agentsText);
+					if (checkChatInstructions(merged)) return send({ type: "error", message: "AGENTS.md is too long to add to the instructions." });
+					chatInstructions[String(conv.id)] = merged;
+					saveChatInstructions(config.dataDir, chatInstructions);
 				}
 				await applySettings(conv, models, settings, chatInstructions[String(conv.id)], folder ? folderPath(folder) : undefined);
 				await openChat(conv);
@@ -312,6 +336,20 @@ wss.on("connection", async (socket: WebSocket) => {
 				else delete chatInstructions[key];
 				saveChatInstructions(config.dataDir, chatInstructions);
 				await applySettings(active, models, settings, text);
+				send({ type: "chat-instructions", conversationId: active.id, instructions: text });
+			} else if (msg.type === "load-agents") {
+				// Copies the active chat's folder AGENTS.md into its instructions box (replacing an earlier copy of it).
+				const folder = chatFolders[String(active.id)];
+				if (!folder) return send({ type: "error", message: "This chat has no folder." });
+				const read = await readAgents(folder);
+				if ("error" in read) return send({ type: "error", message: read.error });
+				if (!read.found) return send({ type: "error", message: "No AGENTS.md in this chat's folder." });
+				const text = mergeAgentsMd(chatInstructions[String(active.id)] ?? "", read.text);
+				const problem = checkChatInstructions(text);
+				if (problem) return send({ type: "error", message: `Not loaded: ${problem}` });
+				chatInstructions[String(active.id)] = text;
+				saveChatInstructions(config.dataDir, chatInstructions);
+				await applySettings(active, models, settings, text, folderPath(folder));
 				send({ type: "chat-instructions", conversationId: active.id, instructions: text });
 			} else if (msg.type === "review") {
 				// Answer review for this chat only. Takes effect on the next answer.

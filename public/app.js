@@ -177,6 +177,7 @@ ws.onmessage = (e) => {
 		instrText.value = msg.instructions ?? "";
 		instrMsg.textContent = "";
 		status.textContent = msg.folder ? "connected · folder " + msg.folder : "connected";
+		document.getElementById("loadagents").disabled = !msg.folder;
 		newMsg.textContent = "";
 		ws.send(JSON.stringify({ type: "list" }));
 	} else if (msg.type === "chats") renderChats(msg.chats);
@@ -188,6 +189,7 @@ ws.onmessage = (e) => {
 		mcpMsg.textContent = msg.message;
 		instrMsg.textContent = msg.message;
 	} else if (msg.type === "chat-instructions") {
+		instrText.value = msg.instructions ?? "";
 		instrMsg.textContent = msg.instructions ? "Saved. Applies from the next request." : "Cleared for this chat.";
 	} else if (msg.type === "settings") showSettings(msg);
 	else if (msg.type === "auth") showKey(msg.anthropic);
@@ -266,6 +268,10 @@ limitInput.oninput = () => (settingsMsg.textContent = "Not applied yet.");
 maxTurnsInput.oninput = () => (settingsMsg.textContent = "Not applied yet.");
 const instrText = document.getElementById("instrtext");
 const instrMsg = document.getElementById("instrmsg");
+document.getElementById("loadagents").onclick = () => {
+	instrMsg.textContent = "Loading…";
+	ws.send(JSON.stringify({ type: "load-agents" }));
+};
 document.getElementById("instrform").onsubmit = (e) => {
 	e.preventDefault();
 	instrMsg.textContent = "Saving…";
