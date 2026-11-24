@@ -64,3 +64,13 @@ Chat box stays for per-chat notes. Model gets: AGENTS.md text, then chat text.
 - [x] 9.2 server: refresh before each submit in a folder and when a folder's rules change (applyFolder); new chat reads rules; open message carries modelInstructions (resolved agent instructions) so tests can see what the model gets; startup strips old copied AGENTS block from chat-instructions.json. Remove workspace-get/save/load-agents and load-agents handlers. DONE.
 - [x] 9.3 Browser: workspace dialog edits AGENTS.md (workspace-agents-get/save); remove wsLoad and chat loadagents buttons.
 - [x] 9.4 Tests: replace tests/workspace-settings.test.ts and the copy tests in tests/chat-folder.test.ts with equivalents (reason in NOTES). Suite green. Commit, push origin. Prod deploy only after asking.
+
+## Goal 10: OpenAI-compatible endpoint for Home Assistant voice (started 2026-11-24, user approved design m02035)
+Design: Home Assistant's conversation agent calls `POST /v1/chat/completions` (OpenAI shape). The model name `pi/<folder>` picks the workspace. One voice chat per folder, created on first use. Only the last user message is used (the app keeps the history). Own API key, separate from the login token, stored hashed. Voice chats get no runner tools unless the folder's voice-tools switch is on (default off).
+Bind stays 127.0.0.1 unless the user decides otherwise (open question in STATE.md).
+- [ ] 10.1 src/api-keys.ts: generate key (shown once), store SHA-256 hash in DATA_DIR/api-keys.json (mode 600), verify with timing-safe compare; revoke. Tests: tests/api-keys.test.ts.
+- [ ] 10.2 Server: GET /v1/models (list `pi/<folder>` for every folder a chat uses); POST /v1/chat/completions non-streaming (stream:true -> 400 for now); bearer key required; unknown model -> 404 OpenAI error "No workspace named ...". Tests: tests/openai-api.test.ts.
+- [ ] 10.3 Voice chat per folder: stored mapping folder -> conversation id (DATA_DIR/voice-chats.json); created with folder settings; last user message submitted, answer returned; busy -> 409/429 with clear message. Tests in same file.
+- [ ] 10.4 Voice-tools switch per folder: workspace-config field `voiceTools` (default false = voice chats have no runner tools); applied to voice chats. Tests in tests/workspace-config.test.ts.
+- [ ] 10.5 Browser: settings panel to create/revoke the Home Assistant key (show once), and the per-folder voice-tools checkbox in the workspace dialog. Browser check needs user sign-in.
+- [ ] 10.6 Docs: NOTES (decisions), STATE (LAN reachability needs a decision), docs/HOME-ASSISTANT.md with the HA setup (Extended OpenAI Conversation base URL, model name per agent). Live check with claude-haiku-5-5 at 100000 limit, logged in NOTES.
