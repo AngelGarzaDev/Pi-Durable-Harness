@@ -68,7 +68,7 @@ Chat box stays for per-chat notes. Model gets: AGENTS.md text, then chat text.
 ## Goal 10: OpenAI-compatible endpoint for Home Assistant voice (started 2026-11-24, user approved design m02035)
 Design: Home Assistant's conversation agent calls `POST /v1/chat/completions` (OpenAI shape). The model name `pi/<folder>` picks the workspace. One voice chat per folder, created on first use. Only the last user message is used (the app keeps the history). Own API key, separate from the login token, stored hashed. Voice chats get no runner tools unless the folder's voice-tools switch is on (default off).
 Bind stays 127.0.0.1 unless the user decides otherwise (open question in STATE.md).
-- [ ] 10.1 src/api-keys.ts: generate key (shown once), store SHA-256 hash in DATA_DIR/api-keys.json (mode 600), verify with timing-safe compare; revoke. Tests: tests/api-keys.test.ts.
+- [x] 10.1 src/api-keys.ts: generate key (shown once), store SHA-256 hash in DATA_DIR/api-keys.json (mode 600), verify with timing-safe compare; revoke. Tests: tests/api-keys.test.ts.
 - [ ] 10.2 Server: GET /v1/models (list `pi/<folder>` for every folder a chat uses); POST /v1/chat/completions non-streaming (stream:true -> 400 for now); bearer key required; unknown model -> 404 OpenAI error "No workspace named ...". Tests: tests/openai-api.test.ts.
 - [ ] 10.3 Voice chat per folder: stored mapping folder -> conversation id (DATA_DIR/voice-chats.json); created with folder settings; last user message submitted, answer returned; busy -> 409/429 with clear message. Tests in same file.
 - [ ] 10.4 Voice-tools switch per folder: workspace-config field `voiceTools` (default false = voice chats have no runner tools); applied to voice chats. Tests in tests/workspace-config.test.ts.
