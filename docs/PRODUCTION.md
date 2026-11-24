@@ -8,7 +8,7 @@ The development stack (repo root `compose.yaml`, port 8787) is separate and may 
 |---|---|---|
 | Compose file | `deploy/production/compose.yaml` | `compose.yaml` (repo root) |
 | Compose project | `pi-durable-prod` | `pi-durable-web` |
-| URL | http://127.0.0.1:8790 | http://127.0.0.1:8787 |
+| URL | http://192.168.1.30:8790 | http://127.0.0.1:8787 |
 | Containers | `pi-durable-prod-app-1`, `pi-durable-prod-runner-1` | `pi-durable-web-app-1`, `pi-durable-web-runner-1` |
 | Chat data (volume) | `pi-durable-prod_app-data` | `pi-durable-web_app-data` (old test chats) |
 | Workspace (volume) | `pi-durable-prod_workspace` | `pi-durable-web_workspace` (old test files) |
@@ -32,7 +32,7 @@ deploy/production/deploy.sh      # builds, starts, waits for /healthz on 8790, w
 ```
 `deploy/production/.deployed-commit` records the commit that is running. Check with:
 ```
-curl -s http://127.0.0.1:8790/healthz      # prints ok
+curl -s http://192.168.1.30:8790/healthz      # prints ok
 cat deploy/production/.deployed-commit
 cd deploy/production && docker compose ps
 ```
