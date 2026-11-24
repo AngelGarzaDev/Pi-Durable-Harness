@@ -285,3 +285,4 @@
 - 2026-11-23 prod redeployed to 83d5fa7 (workspace-get fix). Backup deploy/production/backup/app-data-pre-workspace-get-fix-2026-11-23.tgz (backup dir root-owned write failed; written via stdout redirect).
 - Goal 10 decisions (user approved m02035): model name pi/<folder> picks the workspace; separate HA API key stored as SHA-256 hash in DATA_DIR/api-keys.json (0600), shown once; voice chats get no runner tools by default (voiceTools off).
 - 10.1 done: src/api-keys.ts (create/revoke/find/bearer), tests/api-keys.test.ts. Suite 139/139.
+- LAN exposure (user m02061 "Let's open it to LAN"): production (8790) now published on the main LAN address 192.168.1.30 only, not 0.0.0.0 (as DESIGN.md recommends). Dev (8787) stays 127.0.0.1. Login token, lockout and API keys still apply. Risk: plain HTTP, so token and API keys cross the LAN in clear. Mitigation later: HTTPS proxy (SECURE_COOKIES=1). No firewall rule was added; check the host firewall if the LAN can't reach it.

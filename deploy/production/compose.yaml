@@ -26,7 +26,7 @@ services:
       ANTHROPIC_MODEL: claude-haiku-5-5
     secrets: [anthropic_api_key, app_token, runner_token]
     volumes: ["app-data:/data"]
-    ports: ["127.0.0.1:8790:8787"]
+    ports: ["192.168.1.30:8790:8787"]
     networks: [edge, tools]
     depends_on:
       runner: { condition: service_healthy }

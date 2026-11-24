@@ -16,7 +16,7 @@ Goal 10: OpenAI-compatible endpoint for Home Assistant voice (docs/PLAN.md). Des
 - Prod: `deploy/production/deploy.sh` (only when user asks). Backup first.
 
 ## Needs you
-- Home Assistant reachability: the app listens on 127.0.0.1 only. Choose LAN bind or Tailscale, or keep local. Not decided.
+- LAN: production 8790 now bound to 192.168.1.30 (user approved m02061). Plain HTTP on LAN: consider HTTPS before real use with HA keys.
 - Create the HA API key once the endpoint exists (shown once in the browser settings).
 - Browser check of workspace dialog (needs sign-in).
 
