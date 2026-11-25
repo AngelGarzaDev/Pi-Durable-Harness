@@ -55,7 +55,7 @@ services:
       RUNNER_TOKEN_FILE: /run/secrets/runner_token
     secrets: [runner_token]
     volumes: ["workspace:/workspace"]
-    networks: [tools]
+    networks: [tools, lan]   # lan: runner reaches the LAN (user-approved, see docs/PRODUCTION.md)
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 30s
@@ -65,6 +65,7 @@ services:
 networks:
   edge: {}
   tools: { internal: true }
+  lan: {}                  # normal bridge: runner can reach the LAN and the internet
 
 secrets:
   anthropic_api_key:
