@@ -1,0 +1,24 @@
+// Live check of keep-going against a running app, Haiku only, low cap to bound cost. Usage: node scripts/live-keep-going.mjs (APP_TOKEN_FILE optional). Run from the repo root.
+import WebSocket from "ws";
+import { readFileSync } from "node:fs";
+const base = process.env.APP_URL ?? "http://127.0.0.1:8787";
+const token = readFileSync(process.env.APP_TOKEN_FILE ?? "secrets/app_token", "utf8").trim();
+const login = await fetch(base + "/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
+const cookie = login.headers.get("set-cookie").split(";")[0];
+const ws = new WebSocket(base.replace(/^http/, "ws") + "/ws", { headers: { cookie } });
+let view = null; const errors = []; const kg = [];
+ws.on("message", (d) => { const m = JSON.parse(d); if (m.type === "view") view = m.view; if (m.type === "error") errors.push(m.message); if (m.type === "keepgoing") kg.push(m); });
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const send = (o) => ws.send(JSON.stringify(o));
+const text = (e) => (e.model ?? []).map((x) => (typeof x.content === "string" ? x.content : (x.content ?? []).map((b) => b.text ?? "").join(""))).join(" | ").slice(0, 300);
+await new Promise((r) => ws.on("open", r)); await wait(1500);
+send({ type: "new" }); await wait(1500);
+send({ type: "settings", modelId: "claude-haiku-5-5", contextLimit: 100000, maxTurns: 20 }); await wait(1500);
+send({ type: "keepgoing", on: true, maxContinues: 1 }); await wait(1500);
+send({ type: "submit", content: process.env.KG_PROMPT ?? "Write a three-line poem about the sea. Then say DONE on its own last line." });
+await wait(90000);
+console.log("keepgoing msgs:", JSON.stringify(kg));
+console.log("order:", view.entries.map((e) => e.kind.replace("pi.", "")).join(" > "));
+for (const e of view.entries) if (e.kind !== "pi.tool-result" && e.kind !== "pi.system") console.log(e.kind, "::", text(e), e.data ? JSON.stringify(e.data) : "");
+console.log("errors:", JSON.stringify(errors));
+ws.close();

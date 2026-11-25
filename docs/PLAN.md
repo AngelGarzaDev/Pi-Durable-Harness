@@ -83,5 +83,5 @@ Stop rules to implement: the model says DONE (marker agreed in the prompt), max 
 - [x] 11.2 src/keep-going.ts: pure decision function (answer, continues so far, cap, done marker) -> continue text or stop reason. Tests: tests/keep-going.test.ts.
 - [x] 11.3 Wire onYield hook per chat (workspace or chat setting); record stop reason in transcript. Tests with faux provider.
 - [x] 11.4 Browser toggle + stop reason shown. Browser check by user.
-- [ ] 11.5 Live check claude-haiku-5-5 at 100000 limit; log cost in NOTES.
-- [ ] 11.6 Docs and deploy (dev first; prod only if user asks).
+- [x] 11.5 Live check claude-haiku-5-5 at 100000 limit; log cost in NOTES.
+- [x] 11.6 Docs and deploy (dev first; prod only if user asks).

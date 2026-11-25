@@ -126,6 +126,15 @@ Anthropic key is always read from a file, never from an environment variable.
 Chat settings (model, context limit, maximum tool rounds, review) are changed in the browser and saved in
 `DATA_DIR/settings.json`. The default context limit is 100,000 tokens.
 
+### Keep going
+
+Off by default, per chat ("Keep going" checkbox, rounds picker: 3/5/10/20, default 5). When on, the system
+prompt asks the model to end its final message with a line containing only `DONE`. If an answer does not end
+with `DONE`, the app sends "[Keep going] ..." and the model continues, up to the rounds limit. The loop stops
+when the answer ends with `DONE` (reason `done`), when the limit is reached (`cap`), or when the answer is
+empty (`empty`). The transcript shows a "Keep going stopped" line with the reason. The cap
+counts continues since your last message, so a new message starts a fresh count. The `maxTurns` limit still applies on top.
+
 ## Upgrading
 
 Earlier versions ran the runner as uid 10001, so the `workspace` volume may be owned by that uid and the

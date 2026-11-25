@@ -1,7 +1,7 @@
 # STATE
 
 ## Current task
-Goal 11: keep-going loop (docs/PLAN.md). 11.1-11.4 done (167 tests). Next: 11.5 live Haiku check, then 11.6 docs and dev deploy.
+Goal 11 keep-going: DONE in code, docs and dev (see docs/PLAN.md). Prod NOT deployed; needs user go-ahead. Next: check PLAN.md for unchecked items.
 
 ## Done this session
 - Goal 10 complete; prod at 3ade10a (voice key panel live, healthy at 192.168.1.30:8790).
