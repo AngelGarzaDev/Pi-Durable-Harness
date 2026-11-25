@@ -40,6 +40,12 @@ test("check: null means inherit and is dropped; the combination is checked", () 
 	assert.deepEqual(checkWorkspaceConfig({}, global, lookup), { config: {} });
 });
 
+test("voice tools: a boolean, off unless the folder turns it on", () => {
+	assert.deepEqual(checkWorkspaceConfig({ voiceTools: true }, global, lookup), { config: { voiceTools: true } });
+	assert.deepEqual(checkWorkspaceConfig({ voiceTools: false }, global, lookup), { config: { voiceTools: false } });
+	assert.match((checkWorkspaceConfig({ voiceTools: "yes" }, global, lookup) as { error: string }).error, /on or off/);
+});
+
 test("store: save and load round-trip; bad entries dropped", () => {
 	const dir = mkdtempSync(join(tmpdir(), "pdw-wcfg-"));
 	assert.deepEqual(loadWorkspaceConfigs(dir), {});

@@ -10,11 +10,13 @@ export type WorkspaceConfig = {
 	maxTurns?: number;
 	// MCP server names that are switched off for chats in this folder.
 	disabledMcp?: string[];
+	// Lets the voice chat of this folder (Home Assistant) use the folder's tools. Off by default: voice chats get no tools.
+	voiceTools?: boolean;
 };
 
 export type WorkspaceConfigs = Record<string, WorkspaceConfig>;
 
-const FIELDS = ["modelId", "contextLimit", "maxTurns", "disabledMcp"] as const;
+const FIELDS = ["modelId", "contextLimit", "maxTurns", "disabledMcp", "voiceTools"] as const;
 
 // Keeps only known fields with the right types. A bad entry is dropped, not repaired.
 function cleanConfig(raw: unknown): WorkspaceConfig | undefined {
@@ -24,6 +26,7 @@ function cleanConfig(raw: unknown): WorkspaceConfig | undefined {
 	if (typeof r.modelId === "string" && r.modelId !== "") out.modelId = r.modelId;
 	if (Number.isInteger(r.contextLimit)) out.contextLimit = r.contextLimit as number;
 	if (Number.isInteger(r.maxTurns)) out.maxTurns = r.maxTurns as number;
+	if (typeof r.voiceTools === "boolean") out.voiceTools = r.voiceTools;
 	if (Array.isArray(r.disabledMcp)) {
 		const names = [...new Set(r.disabledMcp.filter((n): n is string => typeof n === "string" && n !== ""))];
 		if (names.length > 0) out.disabledMcp = names;
@@ -70,6 +73,7 @@ export function checkWorkspaceConfig(
 	if (out.modelId !== undefined && (typeof out.modelId !== "string" || !lookup(out.modelId))) return { error: "Unknown model." };
 	if (out.contextLimit !== undefined && typeof out.contextLimit !== "number") return { error: "Context limit must be a number." };
 	if (out.maxTurns !== undefined && typeof out.maxTurns !== "number") return { error: "Max tool rounds must be a number." };
+	if (out.voiceTools !== undefined && typeof out.voiceTools !== "boolean") return { error: "Voice tools must be on or off." };
 	if (out.disabledMcp !== undefined && (!Array.isArray(out.disabledMcp) || out.disabledMcp.some((n) => typeof n !== "string"))) {
 		return { error: "Disabled MCP servers must be a list of names." };
 	}

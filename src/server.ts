@@ -102,8 +102,8 @@ async function applyChat(conv: Conversation, id: unknown, global: ChatSettings =
 		instructions: effectiveInstructions(id),
 		cwd: folder ? folderPath(folder) : undefined,
 		// Voice chats run with no tools and no MCP servers, whatever the folder allows in the browser.
-		disabledMcp: isVoiceChat(id) ? mcp.list().map((s) => s.name) : folder ? workspaceConfigs[folder]?.disabledMcp : undefined,
-		noTools: isVoiceChat(id),
+		disabledMcp: isVoiceChat(id) && !voiceToolsOn(folder) ? mcp.list().map((s) => s.name) : folder ? workspaceConfigs[folder]?.disabledMcp : undefined,
+		noTools: isVoiceChat(id) && !voiceToolsOn(folder),
 	});
 }
 // One voice chat per folder, for the OpenAI-compatible API. Stored in DATA_DIR/voice-chats.json (folder -> conversation id).
@@ -113,6 +113,10 @@ function saveVoiceChats() {
 	const tmp = voiceFile + ".tmp";
 	writeFileSync(tmp, JSON.stringify(voiceChats, null, 2));
 	renameSync(tmp, voiceFile);
+}
+// A folder's voice chat may use tools only when the folder switches voiceTools on (default off).
+function voiceToolsOn(folder: string): boolean {
+	return workspaceConfigs[folder]?.voiceTools === true;
 }
 function isVoiceChat(id: unknown): boolean {
 	return Object.values(voiceChats).includes(String(id));
