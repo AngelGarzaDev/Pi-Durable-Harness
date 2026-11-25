@@ -171,3 +171,13 @@ No test calls a paid model. The live checks in `scripts/` do call the model and 
 Copyright (C) the authors. Licensed under the GNU Affero General Public License v3.0 or later
 (AGPL-3.0-or-later), see [LICENSE](LICENSE). If you run a modified version as a network service,
 you must offer its source to its users.
+
+### Giving the runner access to the LAN
+
+`compose.lan.yaml` puts the runner on a normal bridge network, so it can reach the LAN and the internet:
+
+```sh
+docker compose -f compose.yaml -f compose.lan.yaml up -d --build
+```
+
+This also lets the agent reach host services (for example SSH on the host) and LAN devices. Compose cannot limit it to the LAN only.

@@ -1,0 +1,10 @@
+# Override: lets the RUNNER (shell and file tools) reach the LAN (192.168.x.x, 10.x, 172.16.x) and the internet.
+# Use: docker compose -f compose.yaml -f compose.lan.yaml up -d --build
+# Compose cannot restrict a bridge to the LAN only; a host firewall rule would be needed (not set up here).
+# It also lets the agent reach LAN devices and the host's own services, so enable it only when wanted.
+services:
+  runner:
+    networks: [tools, lan]
+
+networks:
+  lan: {}
