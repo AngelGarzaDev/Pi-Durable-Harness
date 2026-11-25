@@ -299,3 +299,8 @@
 - Browser sign-in check of the panel on dev: user reported complete (m02353).
 - CLEANUP 2026-11-24 (user m02381: test data may be deleted if I see fit): removed empty dev runner dir /workspace/livecheck. Kept /workspace/mcp-live/echo-server.mjs because dev /data/mcp.json still registers it as the "echo" MCP server; removing it means editing that config. Kept the dev workspace life_manager_questionnaire.md (not clearly test data). Test folders "livecheck" and "agentscheck" and chats in app-data were not deleted (app data; needs a deliberate in-app delete).
 - CLEANUP 2026-11-24: user (m02394) approved deleting dev /workspace/life_manager_questionnaire.md; deleted.
+
+## Goal 11 keep-going (2026-11-25)
+- Decisions (user m02407/m02421): work until done; per chat; stop marker DONE as the last line; default cap 5 continues per user request, hard max 20; continuation text carries the marker "[Keep going]" so continues can be counted (countContinues) and skipped by the review hook.
+- Docs (Pi Durable README) give no recommendation on when to stop; the only rule is that a continuing extension must bound its own loop (run.turns resets per continue).
+- 11.2 done: src/keep-going.ts (pure: endsWithDone, decideKeepGoing, countContinues, clampMaxContinues). tests/keep-going.test.ts, 8 tests. Suite 162/162.
