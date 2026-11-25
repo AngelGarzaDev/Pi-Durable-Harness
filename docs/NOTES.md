@@ -294,3 +294,4 @@
 - User checks (reported): HA subentry verified (base URL http://192.168.1.30:8790/v1, model pi/lifemanager); test conversation in Assist done. Results not recorded in detail here.
 - Docs: docs/HOME-ASSISTANT.md written (endpoint, auth, pi/<folder> models, voice tools default off, 400/401/404/409 table, HA setup, LAN HTTP caveat).
 - Still open for goal 10: one live claude-haiku-5-5 check at context <=100000, cost logged here; then STATE/PLAN update.
+- LIVE CHECK 2026-11-24 (goal 10.6): one POST /v1/chat/completions on dev (127.0.0.1:8787), model pi/livecheck (folder "livecheck", no voice tools), model claude-haiku-5-5 from global settings, contextLimit 100000. Prompt: "In one short sentence, what is 17 times 3?" Reply "17 times 3 is 51.", HTTP 200, 674 ms. Cost: roughly 0.1 cent or less (one tiny Haiku turn; the API response has no usage field, so exact tokens unknown). A temporary key was created via WS and revoked; the revoked key returned 401.
