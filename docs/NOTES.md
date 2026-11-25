@@ -286,3 +286,11 @@
 - Goal 10 decisions (user approved m02035): model name pi/<folder> picks the workspace; separate HA API key stored as SHA-256 hash in DATA_DIR/api-keys.json (0600), shown once; voice chats get no runner tools by default (voiceTools off).
 - 10.1 done: src/api-keys.ts (create/revoke/find/bearer), tests/api-keys.test.ts. Suite 139/139.
 - LAN exposure (user m02061 "Let's open it to LAN"): production (8790) now published on the main LAN address 192.168.1.30 only, not 0.0.0.0 (as DESIGN.md recommends). Dev (8787) stays 127.0.0.1. Login token, lockout and API keys still apply. Risk: plain HTTP, so token and API keys cross the LAN in clear. Mitigation later: HTTPS proxy (SECURE_COOKIES=1). No firewall rule was added; check the host firewall if the LAN can't reach it.
+
+## 2026-11-24 Goal 10: Home Assistant voice (Assist)
+- Voice key panel in global settings: create (shown once), list without hashes, revoke. Folder checkbox "voice tools" default off (c1f45fb). Tests: tests/voice-keys-ws.test.ts (5). Test fix: create sends a trailing api-keys reply that must be consumed (waitFor helper), otherwise later replies are stale.
+- Full suite before the commit: 154/154 (npm run typecheck && npm test).
+- Dev deployed (docker compose up -d --build): healthz ok, served app.js contains the panel. Browser sign-in check of the panel still needed from user.
+- User checks (reported): HA subentry verified (base URL http://192.168.1.30:8790/v1, model pi/lifemanager); test conversation in Assist done. Results not recorded in detail here.
+- Docs: docs/HOME-ASSISTANT.md written (endpoint, auth, pi/<folder> models, voice tools default off, 400/401/404/409 table, HA setup, LAN HTTP caveat).
+- Still open for goal 10: one live claude-haiku-5-5 check at context <=100000, cost logged here; then STATE/PLAN update.
