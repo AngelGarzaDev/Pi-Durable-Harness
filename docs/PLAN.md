@@ -74,3 +74,14 @@ Bind stays 127.0.0.1 unless the user decides otherwise (open question in STATE.m
 - [x] 10.4 Voice-tools switch per folder: workspace-config field `voiceTools` (default false = voice chats have no runner tools); applied to voice chats. Tests in tests/workspace-config.test.ts.
 - [x] 10.5 Browser: settings panel to create/revoke the Home Assistant key (show once), and the per-folder voice-tools checkbox in the workspace dialog. Browser check needs user sign-in (pending).
 - [x] 10.6 Docs: NOTES (decisions), STATE (LAN reachability needs a decision), docs/HOME-ASSISTANT.md with the HA setup (Extended OpenAI Conversation base URL, model name per agent). Live check with claude-haiku-5-5 at 100000 limit, logged in NOTES.
+
+## Goal 11: Keep-going loop (started 2026-11-24, user request m02031; design to confirm)
+Idea: when the model gives a final answer, the run can continue on its own with "Keep going." until the work is done or a limit is hit. Off by default, switched on per chat.
+Pi Durable mechanism (node_modules/@earendil-works/pi-durable/README.md ~line 771, 843-869): hook GenerationTask `onYield` returning `{ continue: "Keep going." }` continues the same run; a user message queued meanwhile wins; `run.turns` resets per continue, so the loop must bound itself (count continues per user request). Alternative: `settings.afterFailedRun` is not the right tool (it only handles failed runs).
+Stop rules to implement: the model says DONE (marker agreed in the prompt), max continues per request (default 5, cap 20), turn limit still applies, user steer or message ends it, stop button ends it.
+- [ ] 11.1 Confirm design with user: exact meaning of "keep going", stop marker, default max continues. (Open question: original wording of m02031 is not in the notes; ask user to restate.)
+- [ ] 11.2 src/keep-going.ts: pure decision function (answer, continues so far, cap, done marker) -> continue text or stop reason. Tests: tests/keep-going.test.ts.
+- [ ] 11.3 Wire onYield hook per chat (workspace or chat setting); record stop reason in transcript. Tests with faux provider.
+- [ ] 11.4 Browser toggle + stop reason shown. Browser check by user.
+- [ ] 11.5 Live check claude-haiku-5-5 at 100000 limit; log cost in NOTES.
+- [ ] 11.6 Docs and deploy (dev first; prod only if user asks).

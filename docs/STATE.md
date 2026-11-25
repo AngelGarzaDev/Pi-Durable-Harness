@@ -1,23 +1,23 @@
 # STATE
 
 ## Current task
-Goal 10 complete. Prod deployed at 3ade10a (panel included, healthy at 192.168.1.30:8790). Browser panel check on dev done by user.
+Goal 11: keep-going loop (docs/PLAN.md). Planned only; step 11.1 needs the user to confirm the design.
 
 ## Done this session
-- 10.2-10.4: /v1/models, /v1/chat/completions (non-streaming), voice chat per folder, voiceTools switch (default off). Commit f7c2de8 on prod.
-- 10.5: voice key panel (create once, list, revoke) and folder voice-tools checkbox. Commit c1f45fb (dev only).
-- 10.6: docs/HOME-ASSISTANT.md (9ee3397); live Haiku check pi/livecheck, 200, ~0.1 cent (ef410de, logged in NOTES).
-- User confirmed HA subentry (http://192.168.1.30:8790/v1, pi/lifemanager) and a test conversation in Assist.
-- Suite 154/154 before c1f45fb.
+- Goal 10 complete; prod at 3ade10a (voice key panel live, healthy at 192.168.1.30:8790).
+- Test-data cleanup: deleted dev /workspace/livecheck and /workspace/life_manager_questionnaire.md (user approved). Kept /workspace/mcp-live (still referenced by dev mcp.json as "echo").
+- User confirmed: MCP settings, MCP dialogs, question card, MCP-off work. No chat-view note needed.
 
 ## Next step
-1. Next: keep-going loop (user request m02031, not started). Design notes in NOTES.
+11.1: ask the user to restate "keep going" (the original wording m02031 is not in the notes): when to continue, stop marker, max continues. Then 11.2.
 
 ## How to run and test
-- Tests: `npm run typecheck && npm test` (154 passing).
+- Tests: `npm run typecheck && npm test` (154 passing at last run).
 - Dev: `docker compose up -d --build` in durable-web/, check http://127.0.0.1:8787/healthz.
 - Prod: `deploy/production/deploy.sh` (only when user asks). Backup first.
 
 ## Needs you
-- None for goal 10.
-- LAN is plain HTTP (approved m02061). Consider HTTPS before heavy use.
+- Keep-going design answers (11.1).
+- Goal 5.2 second user check (parked, m01458).
+- Dev mcp.json "echo" entry and /workspace/mcp-live: delete if you want (say so).
+- Reverse proxy / HTTPS for LAN (you said you'll do it).
