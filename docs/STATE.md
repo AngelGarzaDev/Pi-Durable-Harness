@@ -4,7 +4,7 @@
 Goal 11 keep-going: DONE in code, docs and dev (see docs/PLAN.md). Prod NOT deployed; needs user go-ahead. Next: check PLAN.md for unchecked items.
 
 ## Done this session
-- Goal 10 complete; prod at 3ade10a (voice key panel live, healthy at 192.168.1.30:8790).
+- Goal 10 complete; prod at fc79f24 (workspace Save footer live, healthy at 192.168.1.30:8790).
 - Test-data cleanup: deleted dev /workspace/livecheck and /workspace/life_manager_questionnaire.md (user approved). Kept /workspace/mcp-live (still referenced by dev mcp.json as "echo").
 - User confirmed: MCP settings, MCP dialogs, question card, MCP-off work. No chat-view note needed.
 
