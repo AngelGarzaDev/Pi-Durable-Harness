@@ -1,4 +1,8 @@
 import { createServer } from "node:http";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { ConversationBusy } from "@earendil-works/pi-durable";
+import { bearerKey, findApiKey, loadApiKeys } from "./api-keys.js";
+import { MAX_API_BODY, completionBody, errorBody, latestAnswer, modelList, parseChatRequest } from "./openai-api.js";
 import { failureNotice } from "./notice.js";
 import { AnswerSignal, checkAnswer, pendingQuestions } from "./ask.js";
 import { readFile } from "node:fs/promises";
@@ -97,8 +101,90 @@ async function applyChat(conv: Conversation, id: unknown, global: ChatSettings =
 	await applySettings(conv, models, settingsFor(id, global), {
 		instructions: effectiveInstructions(id),
 		cwd: folder ? folderPath(folder) : undefined,
-		disabledMcp: folder ? workspaceConfigs[folder]?.disabledMcp : undefined,
+		// Voice chats run with no tools and no MCP servers, whatever the folder allows in the browser.
+		disabledMcp: isVoiceChat(id) ? mcp.list().map((s) => s.name) : folder ? workspaceConfigs[folder]?.disabledMcp : undefined,
+		noTools: isVoiceChat(id),
 	});
+}
+// One voice chat per folder, for the OpenAI-compatible API. Stored in DATA_DIR/voice-chats.json (folder -> conversation id).
+const voiceFile = join(config.dataDir, "voice-chats.json");
+let voiceChats: Record<string, string> = existsSync(voiceFile) ? JSON.parse(readFileSync(voiceFile, "utf8")) : {};
+function saveVoiceChats() {
+	const tmp = voiceFile + ".tmp";
+	writeFileSync(tmp, JSON.stringify(voiceChats, null, 2));
+	renameSync(tmp, voiceFile);
+}
+function isVoiceChat(id: unknown): boolean {
+	return Object.values(voiceChats).includes(String(id));
+}
+function knownFolders(): string[] {
+	return [...new Set(Object.values(chatFolders))];
+}
+async function voiceChatFor(folder: string): Promise<Conversation> {
+	const existing = voiceChats[folder];
+	if (existing) {
+		const conv = await harness.conversation(existing as unknown as ConversationId, context).catch(() => undefined);
+		// The stored chat is gone: a new one replaces it below.
+		if (conv) return conv;
+	}
+	const conv = await harness.createConversation({ ownership: { kind: "ownerless" } }, context);
+	titles[String(conv.id)] = "Voice";
+	saveTitles(config.dataDir, titles);
+	chatFolders[String(conv.id)] = folder;
+	saveChatFolders(config.dataDir, chatFolders);
+	voiceChats[folder] = String(conv.id);
+	saveVoiceChats();
+	await applyChat(conv, conv.id);
+	return conv;
+}
+// Runs one request in the folder's voice chat and returns the answer text (or the reason the run ended without one).
+async function askVoice(folder: string, text: string): Promise<{ status: number; content: string } | { status: 200; content: string }> {
+	const refreshed = await folderRules.refresh(folder);
+	const conv = await voiceChatFor(folder);
+	if (refreshed.changed) await applyChat(conv, conv.id);
+	let submission;
+	try {
+		submission = await conv.submit({ type: "input", content: text, whenBusy: "reject" }, context);
+	} catch (error) {
+		if (error instanceof ConversationBusy) return { status: 409, content: "The voice chat for this workspace is busy. Try again when it finishes." };
+		throw error;
+	}
+	const settled = await submission.wait(context);
+	if (settled.status === "done") {
+		const page = await conv.entries({}, 10, undefined, context);
+		const answer = latestAnswer(page.items);
+		if (answer) return { status: 200, content: answer };
+	}
+	const watch = await conv.watch(context);
+	try {
+		return { status: 200, content: failureNotice(watch.value.docs) ?? "No answer was produced." };
+	} finally {
+		await watch.stop();
+	}
+}
+// Bearer key check, then /v1/models or /v1/chat/completions. Errors use the OpenAI error shape.
+async function handleOpenAi(req: import("node:http").IncomingMessage, res: import("node:http").ServerResponse, path: string) {
+	const send = (status: number, body: unknown) => res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+	const key = bearerKey(req.headers.authorization);
+	const record = key ? findApiKey(loadApiKeys(config.dataDir), key) : undefined;
+	if (!record) return send(401, errorBody("Invalid or missing API key.", "authentication_error", "invalid_api_key"));
+	if (path === "/v1/models") {
+		if (req.method !== "GET") return send(405, errorBody("Use GET."));
+		return send(200, modelList(knownFolders()));
+	}
+	if (req.method !== "POST") return send(405, errorBody("Use POST."));
+	let raw: string;
+	try {
+		raw = await readBody(req, MAX_API_BODY);
+	} catch {
+		return send(413, errorBody("The request is too large."));
+	}
+	const parsed = parseChatRequest(raw);
+	if (!parsed.ok) return send(parsed.status, errorBody(parsed.message, "invalid_request_error", parsed.code));
+	if (!knownFolders().includes(parsed.folder)) return send(404, errorBody(`No workspace named ${parsed.folder}.`, "invalid_request_error", "model_not_found"));
+	const result = await askVoice(parsed.folder, parsed.text);
+	if (result.status !== 200) return send(result.status, errorBody(result.content, "server_error"));
+	return send(200, completionBody(parsed.model, result.content));
 }
 if (effectiveInstructions(root.id)) await applyChat(root, root.id);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
@@ -129,12 +215,12 @@ function publicError(error: unknown): string {
 	return `Something went wrong (ref ${ref}).`;
 }
 
-async function readBody(req: import("node:http").IncomingMessage): Promise<string> {
+async function readBody(req: import("node:http").IncomingMessage, limit = MAX_LOGIN_BODY): Promise<string> {
 	const chunks: Buffer[] = [];
 	let size = 0;
 	for await (const chunk of req) {
 		size += (chunk as Buffer).length;
-		if (size > MAX_LOGIN_BODY) throw new Error("body too large");
+		if (size > limit) throw new Error("body too large");
 		chunks.push(chunk as Buffer);
 	}
 	return Buffer.concat(chunks).toString("utf8");
@@ -145,6 +231,13 @@ const server = createServer(async (req, res) => {
 	const url = new URL(req.url ?? "/", "http://localhost");
 	if (url.pathname === "/healthz") {
 		res.writeHead(200, { "content-type": "text/plain" }).end("ok");
+		return;
+	}
+	// Home Assistant (OpenAI-compatible API). Uses its own API key, not the login cookie; see docs/HOME-ASSISTANT.md.
+	if (url.pathname === "/v1/models" || url.pathname === "/v1/chat/completions") {
+		await handleOpenAi(req, res, url.pathname).catch((error) => {
+			if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify(errorBody(publicError(error), "server_error")));
+		});
 		return;
 	}
 	if (url.pathname === "/login" && req.method === "POST") {

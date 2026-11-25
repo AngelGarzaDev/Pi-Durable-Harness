@@ -91,17 +91,19 @@ export async function applySettings(
 	conversation: Conversation,
 	models: ReturnType<typeof createModels>,
 	s: ChatSettings,
-	options: { instructions?: string; cwd?: string; disabledMcp?: string[] } = {},
+	options: { instructions?: string; cwd?: string; disabledMcp?: string[]; noTools?: boolean } = {},
 ) {
 	const info = modelInfo(models, s.modelId);
 	if (!info) throw new Error(`Unknown model ${s.modelId}`);
 	const off = options.disabledMcp ?? [];
+	// noTools (voice chats): the coding tools (bash, read, write, edit) are removed as well as the MCP servers listed.
+	const remove = [...off.map((name) => mcpStub(name)), ...(options.noTools ? [defineExtension({ name: "coding-tools", tools: [] })] : [])];
 	await conversation.configure({
 		model: { provider: "anthropic", modelId: s.modelId },
 		instructions: composeInstructions(options.instructions),
 		compaction: compactionFor(s, info),
 		maxTurns: s.maxTurns,
-		extensions: off.length === 0 ? null : { remove: off.map((name) => mcpStub(name)) },
+		extensions: remove.length === 0 ? null : { remove },
 		...(options.cwd === undefined ? {} : { cwd: options.cwd }),
 	}, context);
 }
