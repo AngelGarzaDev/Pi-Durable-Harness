@@ -98,7 +98,7 @@ export class ReviewSettings {
 	}
 }
 
-function textOf(message: Message | undefined): string {
+export function textOf(message: Message | undefined): string {
 	if (!message) return "";
 	const content = (message as { content?: unknown }).content;
 	if (typeof content === "string") return content;

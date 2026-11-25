@@ -13,6 +13,8 @@ import { WORKSPACE_ROOT } from "./chat-folder.js";
 import { checkSettings, compactionFor, defaultSettings, loadSettings, type ChatSettings, type ModelInfo } from "./settings.js";
 import { readApiKey, readOptionalApiKey, readRunnerToken } from "./config.js";
 import { ReviewSettings, reviewExtension } from "./review.js";
+import { KeepGoingSettings, keepGoingExtension } from "./keep-going-hook.js";
+import { KEEP_GOING_PROMPT } from "./keep-going.js";
 import { askExtension } from "./ask.js";
 import { FileCredentialStore } from "./credentials.js";
 import { McpManager } from "./mcp.js";
@@ -50,6 +52,9 @@ export async function openHarness(config: Config) {
 	// Answer review: installed for all chats, but it only acts in chats that have it switched on (reviews.json).
 	const reviews = new ReviewSettings(config.dataDir);
 	registry.install(reviewExtension(reviews));
+	// Keep-going loop: per chat (settings.json "keepGoing"), off by default.
+	const keepGoing = new KeepGoingSettings(config.dataDir);
+	registry.install(keepGoingExtension(keepGoing));
 	// ask_user: the model asks the person a question; the browser answers (see src/ask.ts).
 	registry.install(askExtension);
 	// MCP servers from DATA_DIR/mcp.json. Failures are recorded per server (see mcp.list()), never thrown here.
@@ -72,7 +77,7 @@ export async function openHarness(config: Config) {
 	});
 	await applySettings(root, models, settings);
 	harness.resume(); // continue any run the last process left unfinished
-	return { harness, root, models, settings, reviews, credentials, secretKey: secretKey !== undefined, mcp, mcpErrors, runnerUrl: config.runnerUrl, runnerToken };
+	return { harness, root, models, settings, reviews, keepGoing, credentials, secretKey: secretKey !== undefined, mcp, mcpErrors, runnerUrl: config.runnerUrl, runnerToken };
 }
 
 // Chat models the browser can pick, from the pi-ai catalog.
@@ -91,7 +96,7 @@ export async function applySettings(
 	conversation: Conversation,
 	models: ReturnType<typeof createModels>,
 	s: ChatSettings,
-	options: { instructions?: string; cwd?: string; disabledMcp?: string[]; noTools?: boolean } = {},
+	options: { instructions?: string; cwd?: string; disabledMcp?: string[]; noTools?: boolean; keepGoing?: boolean } = {},
 ) {
 	const info = modelInfo(models, s.modelId);
 	if (!info) throw new Error(`Unknown model ${s.modelId}`);
@@ -100,7 +105,8 @@ export async function applySettings(
 	const remove = [...off.map((name) => mcpStub(name)), ...(options.noTools ? [defineExtension({ name: "coding-tools", tools: [] })] : [])];
 	await conversation.configure({
 		model: { provider: "anthropic", modelId: s.modelId },
-		instructions: composeInstructions(options.instructions),
+		// Keep-going chats also get the DONE rule (see src/keep-going.ts).
+		instructions: composeInstructions(options.instructions) + (options.keepGoing ? `\n\n${KEEP_GOING_PROMPT}` : ""),
 		compaction: compactionFor(s, info),
 		maxTurns: s.maxTurns,
 		extensions: remove.length === 0 ? null : { remove },

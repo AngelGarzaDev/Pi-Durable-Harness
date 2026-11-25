@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { ConversationBusy } from "@earendil-works/pi-durable";
 import { bearerKey, checkLabel, createApiKey, findApiKey, loadApiKeys, publicApiKeys, revokeApiKey } from "./api-keys.js";
+import { clampMaxContinues } from "./keep-going.js";
 import { MAX_API_BODY, completionBody, errorBody, latestAnswer, modelList, parseChatRequest } from "./openai-api.js";
 import { failureNotice } from "./notice.js";
 import { AnswerSignal, checkAnswer, pendingQuestions } from "./ask.js";
@@ -46,6 +47,7 @@ type ClientMessage =
 	| { type: "workspace-agents-get"; folder: string }
 	| { type: "workspace-agents-save"; folder: string; text: string }
 	| { type: "review"; on?: boolean; reviewerModel?: string }
+	| { type: "keepgoing"; on?: boolean; maxContinues?: number | null }
 	// An answer to a question the model asked (ask_user). taskId and key must match a question shown in the open chat.
 	| { type: "answer"; taskId: number; key: string; text: string }
 	// Anthropic key from the browser. The key is only ever sent TO the server; no message returns it.
@@ -61,7 +63,7 @@ type ClientMessage =
 
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
-const { harness, root, models, settings: initialSettings, reviews, credentials, secretKey, mcp, runnerUrl, runnerToken } = await openHarness(config);
+const { harness, root, models, settings: initialSettings, reviews, keepGoing, credentials, secretKey, mcp, runnerUrl, runnerToken } = await openHarness(config);
 let settings: ChatSettings = initialSettings;
 // The root chat is configured at startup without its own instructions, so apply them here if it has any.
 const titles: Titles = loadTitles(config.dataDir);
@@ -108,6 +110,7 @@ async function applyChat(conv: Conversation, id: unknown, global: ChatSettings =
 		// Voice chats run with no tools and no MCP servers, whatever the folder allows in the browser.
 		disabledMcp: isVoiceChat(id) && !voiceToolsOn(folder) ? mcp.list().map((s) => s.name) : folder ? workspaceConfigs[folder]?.disabledMcp : undefined,
 		noTools: isVoiceChat(id) && !voiceToolsOn(folder),
+		keepGoing: keepGoing.isOn(Number(id)),
 	});
 }
 // One voice chat per folder, for the OpenAI-compatible API. Stored in DATA_DIR/voice-chats.json (folder -> conversation id).
@@ -584,6 +587,14 @@ wss.on("connection", async (socket: WebSocket) => {
 					patch.reviewerModel = id === "" ? null : id;
 				}
 				send({ type: "review", conversationId: active.id, ...reviews.update(active.id, patch) });
+			} else if (msg.type === "keepgoing") {
+				// Per chat. Takes effect on the next answer (the instructions change with the switch).
+				const patch: { on?: boolean; maxContinues?: number | null } = {};
+				if (msg.on !== undefined) patch.on = msg.on === true;
+				if (msg.maxContinues !== undefined) patch.maxContinues = msg.maxContinues === null ? null : clampMaxContinues(msg.maxContinues);
+				const next = keepGoing.update(active.id, patch);
+				await applyChat(active, active.id);
+				send({ type: "keepgoing", conversationId: active.id, ...next });
 			} else if (msg.type === "answer") {
 				// Only a question that is open in the chat on this socket can be answered. The answer goes to the parked tool call.
 				const open = pendingQuestions(watch?.value.docs);

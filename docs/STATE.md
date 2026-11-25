@@ -1,7 +1,7 @@
 # STATE
 
 ## Current task
-Goal 11: keep-going loop (docs/PLAN.md). 11.1 and 11.2 done (src/keep-going.ts pure decisions, 162/162 tests). Next: 11.3 wire onYield per chat.
+Goal 11: keep-going loop (docs/PLAN.md). 11.1-11.3 done (165/165 tests). Next: 11.4 UI toggle and stop-note rendering.
 
 ## Done this session
 - Goal 10 complete; prod at 3ade10a (voice key panel live, healthy at 192.168.1.30:8790).

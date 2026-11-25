@@ -81,7 +81,7 @@ Pi Durable mechanism (node_modules/@earendil-works/pi-durable/README.md ~line 77
 Stop rules to implement: the model says DONE (marker agreed in the prompt), max continues per request (default 5, cap 20), turn limit still applies, user steer or message ends it, stop button ends it.
 - [x] 11.1 Confirm design with user: exact meaning of "keep going", stop marker, default max continues. (Open question: original wording of m02031 is not in the notes; ask user to restate.)
 - [x] 11.2 src/keep-going.ts: pure decision function (answer, continues so far, cap, done marker) -> continue text or stop reason. Tests: tests/keep-going.test.ts.
-- [ ] 11.3 Wire onYield hook per chat (workspace or chat setting); record stop reason in transcript. Tests with faux provider.
+- [x] 11.3 Wire onYield hook per chat (workspace or chat setting); record stop reason in transcript. Tests with faux provider.
 - [ ] 11.4 Browser toggle + stop reason shown. Browser check by user.
 - [ ] 11.5 Live check claude-haiku-5-5 at 100000 limit; log cost in NOTES.
 - [ ] 11.6 Docs and deploy (dev first; prod only if user asks).
