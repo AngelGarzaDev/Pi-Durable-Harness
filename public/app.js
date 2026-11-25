@@ -426,6 +426,10 @@ function showWorkspaceAgents(msg) {
 	wsAgentsMsg.textContent = msg.found ? "" : "No AGENTS.md in this folder yet.";
 }
 document.getElementById("wsclose").onclick = () => wsdlg.close();
+document.getElementById("wssaveall").onclick = () => {
+	document.getElementById("wscfgform").requestSubmit();
+	document.getElementById("wsagentsform").requestSubmit();
+};
 document.getElementById("wscfgform").onsubmit = (e) => {
 	e.preventDefault();
 	const disabledMcp = [...wsMcp.querySelectorAll("input[type=checkbox]")].filter((b) => !b.checked).map((b) => b.value);
