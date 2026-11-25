@@ -1,13 +1,15 @@
 // MCP servers for the chat. Stdio servers run in the runner (POST /v1/mcp/*); http servers are reached from here.
 // Each server becomes one pi-durable extension named mcp:<server>, with tools named mcp__<server>__<tool>.
 // Exposure: "direct" (default) offers the tools to the model; "hidden" keeps them callable by programs only.
-import { McpClient, StreamableHttpTransport, toLlmContent, type McpServerConfig, type Tool } from "@earendil-works/pi-mcp";
+import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent, type McpServerConfig, type Tool } from "@earendil-works/pi-mcp";
 import { defineExtension, defineTool, type Registry } from "@earendil-works/pi-durable";
 import { unsafe } from "@earendil-works/pi-schema";
 import { readMcpConfig, addServer, removeServer, type McpEntry } from "./mcp-config.js";
 
 export type ServerState = "connecting" | "ready" | "error" | "stopped";
-export type ServerStatus = { name: string; kind: "stdio" | "http"; state: ServerState; toolCount: number; error?: string; exposure: "direct" | "hidden"; description?: string };
+// Built-in servers run in this process (not the runner) and are configured in code, not mcp.json. Their names are reserved.
+export type BuiltinServer = { name: string; command: string; args: string[]; env: Record<string, string>; description?: string };
+export type ServerStatus = { name: string; kind: "stdio" | "http" | "builtin"; state: ServerState; toolCount: number; error?: string; exposure: "direct" | "hidden"; description?: string };
 
 type Live = {
 	entry: McpEntry;
@@ -21,18 +23,26 @@ type RunnerReply = { ok: boolean; tools?: Tool[]; content?: unknown[]; isError?:
 
 export class McpManager {
 	private live = new Map<string, Live>();
+	private readonly builtin = new Map<string, BuiltinServer>();
 	constructor(
 		private readonly registry: Registry<any>,
 		private readonly path: string,
 		private readonly runnerUrl: string,
 		private readonly runnerToken: string,
-	) {}
+		builtins: BuiltinServer[] = [],
+	) {
+		for (const b of builtins) this.builtin.set(b.name, b);
+	}
 
 	// Loads mcp.json and starts every enabled server. Failures are recorded per server, never thrown.
+	// Built-in servers start first. An mcp.json entry that uses a built-in name is refused.
 	async start(): Promise<string[]> {
+		await Promise.all([...this.builtin.values()].map((b) => this.startBuiltin(b)));
 		const { entries, errors } = readMcpConfig(this.path);
-		await Promise.all(entries.map((e) => this.startOne(e)));
-		return errors;
+		const own = entries.filter((e) => !this.builtin.has(e.name));
+		const reserved = entries.filter((e) => this.builtin.has(e.name)).map((e) => `"${e.name}" is a built-in server name; rename the mcp.json entry.`);
+		await Promise.all(own.map((e) => this.startOne(e)));
+		return [...errors, ...reserved];
 	}
 
 	list(): ServerStatus[] {
@@ -41,6 +51,7 @@ export class McpManager {
 
 	// Adds to mcp.json and starts the server. Returns an error message or undefined.
 	async add(name: string, raw: Record<string, unknown>, replace = false): Promise<string | undefined> {
+		if (this.builtin.has(name)) return `"${name}" is a built-in server name.`;
 		const err = addServer(this.path, name, raw, replace);
 		if (err) return err;
 		await this.stopOne(name);
@@ -50,6 +61,7 @@ export class McpManager {
 	}
 
 	async remove(name: string): Promise<string | undefined> {
+		if (this.builtin.has(name)) return `"${name}" is a built-in server; it cannot be removed.`;
 		const err = removeServer(this.path, name);
 		if (err) return err;
 		await this.stopOne(name);
@@ -59,7 +71,9 @@ export class McpManager {
 	async reconnect(name: string): Promise<string | undefined> {
 		const l = this.live.get(name);
 		if (!l) return `No server named "${name}".`;
-		await this.startOne(l.entry);
+		const b = this.builtin.get(name);
+		if (b) await this.startBuiltin(b);
+		else await this.startOne(l.entry);
 		return undefined;
 	}
 
@@ -78,6 +92,29 @@ export class McpManager {
 			const tools = kind === "stdio" ? await this.runnerStart(entry) : await this.httpConnect(live, entry.config as McpServerConfig & { url: string });
 			live.tools = tools;
 			live.extension = defineExtension({ name: `mcp:${entry.name}`, tools: tools.map((t) => this.toolFor(entry.name, t, exposure, live)) });
+			this.registry.install(live.extension);
+			status.toolCount = tools.length;
+			status.state = "ready";
+		} catch (error) {
+			status.state = "error";
+			status.error = error instanceof Error ? error.message : String(error);
+		}
+	}
+
+	// Starts a built-in server as a local stdio child with a minimal environment (nothing is inherited, so no API key).
+	private async startBuiltin(b: BuiltinServer): Promise<void> {
+		await this.stopOne(b.name);
+		const status: ServerStatus = { name: b.name, kind: "builtin", state: "connecting", toolCount: 0, exposure: "direct", description: b.description };
+		const entry = { name: b.name, config: { command: b.command, args: b.args, env: b.env, description: b.description } } as McpEntry;
+		const live: Live = { entry, status, tools: [], extension: defineExtension({ name: `mcp:${b.name}`, tools: [] }) };
+		this.live.set(b.name, live);
+		try {
+			const client = new McpClient({ name: "pi-durable-web", version: "1.0.0", requestTimeoutMs: 60_000 });
+			live.client = client;
+			await client.connect(new StdioTransport({ command: b.command, args: b.args, inheritEnv: false, env: b.env, stderr: "pipe", maxStderrBytes: 8192 }));
+			const tools = await client.listTools();
+			live.tools = tools;
+			live.extension = defineExtension({ name: `mcp:${b.name}`, tools: tools.map((t) => this.toolFor(b.name, t, "direct", live)) });
 			this.registry.install(live.extension);
 			status.toolCount = tools.length;
 			status.state = "ready";

@@ -126,6 +126,14 @@ Anthropic key is always read from a file, never from an environment variable.
 Chat settings (model, context limit, maximum tool rounds, review) are changed in the browser and saved in
 `DATA_DIR/settings.json`. The default context limit is 100,000 tokens.
 
+### Web search
+
+The model has `web_search`, `fetch_content`, `get_search_content` and `source_check` (as `mcp__web__*`). They come
+from Pi's `pi-web-access` package (pinned in `package.json`), which runs inside the app container. Without any
+configuration it searches with a keyless provider. To change providers or add API keys, put a `web-search.json`
+in `DATA_DIR/web-access/` (for example `searxngBaseUrl`). Keys live only in that file on the data volume and are
+never printed. The runner still has no internet access. The name `web` is reserved in `mcp.json`.
+
 ### Keep going
 
 Off by default, per chat ("Keep going" checkbox, rounds picker: 3/5/10/20, default 5). When on, the system

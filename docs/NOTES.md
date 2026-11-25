@@ -311,3 +311,9 @@
 - Observation: scripts/live-chat-review.mjs uses reviewerModel claude-sonnet-5-5, which breaks the Haiku-only rule for live calls. Not changed here; keep it in mind before running it again.
 - 11.6 docs: README "Keep going" section. Dev rebuilt at dba2fda (healthz ok). Prod NOT deployed (needs user go-ahead).
 - Goal 11 done pending the "Done" check: tests 167/167, typecheck clean, committed.
+- 2026-11-25 web search (goal 12). Decision: run pi-web-access as a built-in MCP server "web" INSIDE THE APP process, not the runner. Reason: app already has internet; runner has no internet by default and docs/REVIEW-2026-11-22.md item 23 warns against runner egress with an unauthenticated shell.
+- Pinned pi-web-access 0.48.0 exact with `npm install --save-exact --omit=peer`. Its peer deps (pi-ai, pi-coding-agent, pi-tui, typebox) are not needed for MCP mode. Lockfile grew ~3100 lines (MCP SDK, defuddle, linkedom, turndown, undici, unpdf). npm printed install-script warnings for esbuild, protobufjs, @google/genai; scripts were not run (Dockerfile uses --ignore-scripts).
+- Built-in env is explicit and minimal: PATH, HOME, PI_CODING_AGENT_DIR and PI_WEB_ACCESS_CACHE_ROOT, all under DATA_DIR/web-access. No API key is passed. Optional web-search.json and provider keys go in DATA_DIR/web-access (never printed or committed).
+- The name "web" is reserved: mcp.json entries with that name are reported as errors, and add/remove refuse it. Per-chat disabledMcp and voice-chat disabling use the normal server name.
+- Smoke test (outside repo): MCP server listed web_search, fetch_content, get_search_content, source_check; web_search with the keyless exa provider returned Node.js results.
+- Not covered: Pi-only features (curator and summaries, Kimi, ChatGPT-signin OpenAI search, fetch_content answer/extract modes, video). Per the package README these return tool errors in MCP mode.

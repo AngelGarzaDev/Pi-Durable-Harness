@@ -77,7 +77,8 @@ async function ask(payload: Record<string, unknown>, type: string): Promise<Reco
 
 test("mcp-list starts empty", async () => {
 	const reply = await ask({ type: "mcp-list" }, "mcp");
-	assert.deepEqual(reply.servers, []);
+	// The built-in web search server is always listed; only user servers from mcp.json are checked here.
+	assert.deepEqual(reply.servers.filter((s: any) => s.kind !== "builtin"), []);
 	assert.deepEqual(reply.configErrors, []);
 });
 
@@ -115,7 +116,7 @@ test("mcp-update replaces a server's config and reconnects it; an unknown name i
 
 test("mcp-remove takes the server away; removing again is refused", async () => {
 	const reply = await ask({ type: "mcp-remove", name: "pong" }, "mcp");
-	assert.deepEqual(reply.servers, []);
+	assert.deepEqual(reply.servers.filter((s: any) => s.kind !== "builtin"), []);
 	const again = await ask({ type: "mcp-remove", name: "pong" }, "error");
 	assert.match(String(again.message), /No server named/);
 });

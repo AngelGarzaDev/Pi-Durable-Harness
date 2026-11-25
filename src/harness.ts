@@ -18,6 +18,7 @@ import { KEEP_GOING_PROMPT } from "./keep-going.js";
 import { askExtension } from "./ask.js";
 import { FileCredentialStore } from "./credentials.js";
 import { McpManager } from "./mcp.js";
+import { webSearchServer } from "./web-search.js";
 
 export const context = BACKGROUND_CONTEXT;
 
@@ -58,7 +59,7 @@ export async function openHarness(config: Config) {
 	// ask_user: the model asks the person a question; the browser answers (see src/ask.ts).
 	registry.install(askExtension);
 	// MCP servers from DATA_DIR/mcp.json. Failures are recorded per server (see mcp.list()), never thrown here.
-	const mcp = new McpManager(registry, join(config.dataDir, "mcp.json"), config.runnerUrl, runnerToken);
+	const mcp = new McpManager(registry, join(config.dataDir, "mcp.json"), config.runnerUrl, runnerToken, [webSearchServer(config.dataDir)]);
 	const mcpErrors = await mcp.start();
 	const harness = await Harness.open(storage, {
 		models,
