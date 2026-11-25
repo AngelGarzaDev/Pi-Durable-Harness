@@ -317,3 +317,5 @@
 - The name "web" is reserved: mcp.json entries with that name are reported as errors, and add/remove refuse it. Per-chat disabledMcp and voice-chat disabling use the normal server name.
 - Smoke test (outside repo): MCP server listed web_search, fetch_content, get_search_content, source_check; web_search with the keyless exa provider returned Node.js results.
 - Not covered: Pi-only features (curator and summaries, Kimi, ChatGPT-signin OpenAI search, fetch_content answer/extract modes, video). Per the package README these return tool errors in MCP mode.
+- 12.5 dev deploy (2026-11-25): docker compose up -d --build; /healthz ok; /app/node_modules/pi-web-access/dist/mcp-cli.js present in app image; mcp-list shows web builtin ready, 4 tools.
+- 12.5 live check: scripts/live-web-search.mjs, claude-haiku-5-5, contextLimit 100000, maxTurns 6. Order: user > system > assistant (tool call) > tool-result > assistant; final answer cited nodejs.org URLs. Cost: 2 Haiku calls, about 5k tokens, well under 1 cent.

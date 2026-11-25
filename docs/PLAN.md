@@ -91,5 +91,5 @@ Stop rules to implement: the model says DONE (marker agreed in the prompt), max 
 - [x] 12.2 Built-in MCP server "web" in the app process (src/web-search.ts, src/mcp.ts builtin kind, src/harness.ts). Tools: mcp__web__web_search, fetch_content, get_search_content, source_check.
 - [x] 12.3 Tests: tests/web-search.test.ts (3); mcp-ws list/remove expectations ignore built-ins.
 - [x] 12.4 Docs: README config note, NOTES decisions. Commit.
-- [ ] 12.5 Dev deploy (docker compose up -d --build), healthz, one live Haiku check that uses web_search (haiku-5-5, ≤100000).
+- [x] 12.5 Dev deploy (docker compose up -d --build), healthz, one live Haiku check that uses web_search (haiku-5-5, ≤100000).
 - [ ] 12.6 Prod only when user asks (deploy/production/deploy.sh).

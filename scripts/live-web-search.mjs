@@ -1,0 +1,25 @@
+// Live check of the web built-in against a running app, Haiku only. Usage: node scripts/live-web-search.mjs (APP_URL, APP_TOKEN_FILE optional). Run from the repo root.
+import WebSocket from "ws";
+import { readFileSync } from "node:fs";
+const base = process.env.APP_URL ?? "http://127.0.0.1:8787";
+const token = readFileSync(process.env.APP_TOKEN_FILE ?? "secrets/app_token", "utf8").trim();
+const login = await fetch(base + "/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
+const cookie = login.headers.get("set-cookie").split(";")[0];
+const ws = new WebSocket(base.replace(/^http/, "ws") + "/ws", { headers: { cookie } });
+let view = null; const errors = []; let mcp = null;
+ws.on("message", (d) => { const m = JSON.parse(d); if (m.type === "view") view = m.view; if (m.type === "error") errors.push(m.message); if (m.type === "mcp") mcp = m.servers; });
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const send = (o) => ws.send(JSON.stringify(o));
+await new Promise((r) => ws.on("open", r)); await wait(1500);
+send({ type: "mcp-list" }); await wait(1500);
+console.log("mcp:", JSON.stringify((mcp ?? []).map((s) => ({ name: s.name, kind: s.kind, state: s.state, toolCount: s.toolCount }))));
+send({ type: "new" }); await wait(1500);
+send({ type: "settings", modelId: "claude-haiku-5-5", contextLimit: 100000, maxTurns: 6 }); await wait(1500);
+send({ type: "submit", content: process.env.WS_PROMPT ?? "Use the web_search tool once with numResults 2 to find the official Node.js release page. Then reply in one sentence with the URL you found." });
+await wait(120000);
+console.log("order:", view.entries.map((e) => e.kind.replace("pi.", "")).join(" > "));
+for (const e of view.entries) if (e.kind === "pi.tool-call" || e.kind === "pi.tool-result") console.log(e.kind, "::", JSON.stringify(e.data ?? e.model ?? {}).slice(0, 240));
+const last = [...view.entries].reverse().find((e) => e.kind === "pi.assistant");
+console.log("final:", last ? JSON.stringify(last.model ?? last).slice(0, 400) : "(none)");
+console.log("errors:", JSON.stringify(errors));
+ws.close();
