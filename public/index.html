@@ -162,6 +162,7 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     <label>Context limit <input id="wslimit" type="number" min="20000" step="1000" placeholder="global"></label>
     <label>Max tool rounds <input id="wsmaxturns" type="number" min="1" max="500" placeholder="global"></label>
     <fieldset><legend>MCP servers</legend><div id="wsmcp" class="muted">Loading…</div></fieldset>
+    <label><input type="checkbox" id="wsvoice"> Voice requests (Home Assistant) may use this folder's tools: read, write, edit, bash and MCP. Off: voice is chat only.</label>
     <div class="row"><button type="submit">Save defaults</button> <span id="wscfgmsg"></span></div>
   </form>
   <form id="wsagentsform">
@@ -216,6 +217,22 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
   </details>
   <p><button type="button" id="globalclose">Close</button></p>
   </dialog>
+  <details id="voice">
+    <summary>Home Assistant voice keys</summary>
+    <p class="muted">Home Assistant sends one of these keys with each request to Pi Durable. A key is shown once, when created. Revoking a key stops every Home Assistant install that uses it.</p>
+    <ul id="voicekeys"></ul>
+    <form id="voicekeyform">
+      <input id="voicelabel" maxlength="60" placeholder="label, e.g. Home Assistant (kitchen)" size="30" autocomplete="off">
+      <button type="submit">Create key</button>
+      <span id="voicemsg"></span>
+    </form>
+    <div id="voicenew" hidden>
+      <p>New key. Copy it into Home Assistant now; it is not shown again.</p>
+      <input id="voicekey" readonly size="60">
+      <button type="button" id="voicecopy">Copy</button>
+      <button type="button" id="voicehide">Done</button>
+    </div>
+  </details>
   <details id="instr">
     <summary>Chat instructions</summary>
     <form id="instrform">

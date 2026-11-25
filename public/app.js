@@ -243,6 +243,15 @@ ws.onmessage = (e) => {
 	else if (msg.type === "settings") showSettings(msg);
 	else if (msg.type === "auth") showKey(msg.anthropic);
 	else if (msg.type === "mcp") showMcp(msg);
+	else if (msg.type === "api-keys") {
+		showApiKeys(msg.keys);
+		voiceMsg.textContent = "";
+	} else if (msg.type === "api-key-created") {
+		voiceKey.value = msg.key;
+		voiceNew.hidden = false;
+		voiceLabel.value = "";
+		voiceMsg.textContent = "Key created.";
+	} else if (msg.type === "api-key-error") voiceMsg.textContent = msg.message;
 };
 
 const input = document.getElementById("msg");
@@ -293,7 +302,49 @@ const settingsMsg = document.getElementById("settings-msg");
 
 // Global settings dialog.
 const globalDlg = document.getElementById("globaldlg");
-document.getElementById("globalbtn").onclick = () => globalDlg.showModal();
+document.getElementById("globalbtn").onclick = () => {
+	globalDlg.showModal();
+	ws.send(JSON.stringify({ type: "api-keys-get" }));
+};
+
+// Home Assistant voice keys (in the global settings dialog). The plain key appears once, in voicenew.
+const voiceKeys = document.getElementById("voicekeys");
+const voiceForm = document.getElementById("voicekeyform");
+const voiceLabel = document.getElementById("voicelabel");
+const voiceMsg = document.getElementById("voicemsg");
+const voiceNew = document.getElementById("voicenew");
+const voiceKey = document.getElementById("voicekey");
+function showApiKeys(keys) {
+	voiceKeys.textContent = "";
+	if (keys.length === 0) voiceKeys.innerHTML = '<li class="muted">No keys yet.</li>';
+	for (const k of keys) {
+		const li = document.createElement("li");
+		const text = document.createElement("span");
+		text.textContent = k.label + " · created " + new Date(k.createdAt).toLocaleString() + " ";
+		const revoke = document.createElement("button");
+		revoke.type = "button";
+		revoke.textContent = "Revoke";
+		revoke.onclick = () => {
+			if (!confirm("Revoke the key \"" + k.label + "\"? Home Assistant stops working with it.")) return;
+			ws.send(JSON.stringify({ type: "api-key-revoke", id: k.id }));
+		};
+		li.append(text, revoke);
+		voiceKeys.appendChild(li);
+	}
+}
+voiceForm.onsubmit = (e) => {
+	e.preventDefault();
+	voiceMsg.textContent = "Creating…";
+	ws.send(JSON.stringify({ type: "api-key-create", label: voiceLabel.value }));
+};
+document.getElementById("voicecopy").onclick = () => {
+	voiceKey.select();
+	navigator.clipboard?.writeText(voiceKey.value).then(() => (voiceMsg.textContent = "Copied."), () => (voiceMsg.textContent = "Select the key and copy it."));
+};
+document.getElementById("voicehide").onclick = () => {
+	voiceKey.value = "";
+	voiceNew.hidden = true;
+};
 document.getElementById("globalclose").onclick = () => globalDlg.close();
 
 // Workspace settings dialog: one per /workspace/<folder>, opened from the folder's gear button.
@@ -304,6 +355,7 @@ const wsLimit = document.getElementById("wslimit");
 const wsMaxTurns = document.getElementById("wsmaxturns");
 const wsMcp = document.getElementById("wsmcp");
 const wsCfgMsg = document.getElementById("wscfgmsg");
+const wsVoice = document.getElementById("wsvoice");
 const wsAgents = document.getElementById("wsagents");
 const wsAgentsMsg = document.getElementById("wsagentsmsg");
 let wsFolder = "";
@@ -334,6 +386,7 @@ function showWorkspace(msg) {
 	wsMaxTurns.value = cfg.maxTurns ?? "";
 	wsLimit.placeholder = current ? "global " + current.settings.contextLimit : "global";
 	wsMaxTurns.placeholder = current ? "global " + current.settings.maxTurns : "global";
+	wsVoice.checked = cfg.voiceTools === true;
 	const off = new Set(cfg.disabledMcp ?? []);
 	wsMcpNames = msg.mcp.map((s) => s.name);
 	wsMcp.textContent = "";
@@ -364,6 +417,7 @@ document.getElementById("wscfgform").onsubmit = (e) => {
 		contextLimit: wsLimit.value === "" ? null : Number(wsLimit.value),
 		maxTurns: wsMaxTurns.value === "" ? null : Number(wsMaxTurns.value),
 		disabledMcp,
+		voiceTools: wsVoice.checked,
 	};
 	wsCfgMsg.textContent = "Saving…";
 	ws.send(JSON.stringify({ type: "workspace-config", folder: wsFolder, config }));

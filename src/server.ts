@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { ConversationBusy } from "@earendil-works/pi-durable";
-import { bearerKey, findApiKey, loadApiKeys } from "./api-keys.js";
+import { bearerKey, checkLabel, createApiKey, findApiKey, loadApiKeys, publicApiKeys, revokeApiKey } from "./api-keys.js";
 import { MAX_API_BODY, completionBody, errorBody, latestAnswer, modelList, parseChatRequest } from "./openai-api.js";
 import { failureNotice } from "./notice.js";
 import { AnswerSignal, checkAnswer, pendingQuestions } from "./ask.js";
@@ -36,6 +36,10 @@ type ClientMessage =
 	| { type: "open"; conversationId: number }
 	| { type: "settings"; modelId: string; contextLimit: number; maxTurns: number }
 	| { type: "chat-instructions"; text: string }
+	// Home Assistant voice keys (goal 10). The plain key is returned once, by api-key-create only.
+	| { type: "api-keys-get" }
+	| { type: "api-key-create"; label: string }
+	| { type: "api-key-revoke"; id: string }
 	// Workspace (folder) settings. The folder's rules are its AGENTS.md; the folder must be one a chat uses.
 	| { type: "workspace-get"; folder: string }
 	| { type: "workspace-config"; folder: string; config: unknown }
@@ -361,6 +365,7 @@ async function workspaceReply(folder: string) {
 		config: cfg,
 		effective: { modelId: effective.modelId, contextLimit: effective.contextLimit, maxTurns: effective.maxTurns },
 		warning: effective.warning ?? null,
+		voiceTools: cfg.voiceTools === true,
 		mcp: mcp.list().map((s) => ({ name: s.name, state: s.state, disabled: (cfg.disabledMcp ?? []).includes(s.name) })),
 	};
 }
@@ -543,6 +548,17 @@ wss.on("connection", async (socket: WebSocket) => {
 				folderRules.forgetLegacy(folder);
 				await applyFolder(folder);
 				send({ type: "workspace-agents", folder, found: true, text });
+			} else if (msg.type === "api-keys-get") {
+				send({ type: "api-keys", keys: publicApiKeys(loadApiKeys(config.dataDir)) });
+			} else if (msg.type === "api-key-create") {
+				const problem = checkLabel(msg.label);
+				if (problem) return send({ type: "api-key-error", message: problem });
+				const created = createApiKey(config.dataDir, msg.label);
+				send({ type: "api-key-created", key: created.key, record: { id: created.record.id, label: created.record.label, createdAt: created.record.createdAt } });
+				send({ type: "api-keys", keys: publicApiKeys(loadApiKeys(config.dataDir)) });
+			} else if (msg.type === "api-key-revoke") {
+				if (!revokeApiKey(config.dataDir, String(msg.id))) return send({ type: "api-key-error", message: "No key with that id." });
+				send({ type: "api-keys", keys: publicApiKeys(loadApiKeys(config.dataDir)) });
 			} else if (msg.type === "workspace-get") {
 				// Read-only: config, effective values and MCP servers for the dialog. Rules are read with workspace-agents-get.
 				const folder = typeof msg.folder === "string" ? msg.folder : "";

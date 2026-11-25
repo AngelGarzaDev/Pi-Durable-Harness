@@ -64,3 +64,8 @@ export function bearerKey(header: string | undefined): string | undefined {
 	const m = /^Bearer\s+(\S+)$/.exec(header ?? "");
 	return m ? m[1] : undefined;
 }
+
+// What the browser may see of a key: never the hash.
+export function publicApiKeys(keys: ApiKeys): { id: string; label: string; createdAt: string }[] {
+	return keys.map((k) => ({ id: k.id, label: k.label, createdAt: k.createdAt }));
+}
