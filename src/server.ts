@@ -201,7 +201,7 @@ if (effectiveInstructions(root.id)) await applyChat(root, root.id);
 const publicDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css" };
 // Only these files are served. Nothing else under public/ is reachable.
-const PUBLIC_FILES = new Set(["index.html", "login.html", "app.js", "login.js", "review-view.js", "ask-view.js", "markdown-view.js", "chat-order.js", "vendor/marked.esm.js", "vendor/purify.es.mjs"]);
+const PUBLIC_FILES = new Set(["index.html", "login.html", "app.js", "login.js", "review-view.js", "keep-going-view.js", "ask-view.js", "markdown-view.js", "chat-order.js", "vendor/marked.esm.js", "vendor/purify.es.mjs"]);
 
 // Only these are reachable without the session cookie: health check, login page and its script.
 const OPEN_PATHS = new Set(["/healthz", "/login", "/login.html", "/login.js"]);
@@ -417,10 +417,10 @@ wss.on("connection", async (socket: WebSocket) => {
 		active = conv;
 		watch = await conv.watch(context);
 		watch.start(async (call) => {
-			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id), questions: pendingQuestions(call.value.docs) });
+			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id), keepGoing: keepGoing.get(conv.id), questions: pendingQuestions(call.value.docs) });
 			else send({ type: "error", message: publicError(call) });
 		});
-		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id), questions: pendingQuestions(watch.value.docs) });
+		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id), keepGoing: keepGoing.get(conv.id), questions: pendingQuestions(watch.value.docs) });
 		// modelInstructions is what the resolved agent sends to the model (rules, then the chat's text).
 		const agent = await conv.agent(context);
 		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat"), instructions: chatInstructions[String(conv.id)] ?? "", modelInstructions: agent.instructions ?? "", folder: chatFolders[String(conv.id)] ?? "" });

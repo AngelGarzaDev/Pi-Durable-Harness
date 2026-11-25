@@ -1,7 +1,7 @@
 # STATE
 
 ## Current task
-Goal 11: keep-going loop (docs/PLAN.md). 11.1-11.3 done (165/165 tests). Next: 11.4 UI toggle and stop-note rendering.
+Goal 11: keep-going loop (docs/PLAN.md). 11.1-11.4 done (167 tests). Next: 11.5 live Haiku check, then 11.6 docs and dev deploy.
 
 ## Done this session
 - Goal 10 complete; prod at 3ade10a (voice key panel live, healthy at 192.168.1.30:8790).

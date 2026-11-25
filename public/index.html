@@ -253,6 +253,12 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
       <input type="checkbox" id="review"> Review answers
     </label>
     <select id="reviewer" title="Model that checks each answer when review is on. Same as chat uses this chat's model."></select>
+    <label title="Keep working after an answer until the model ends with DONE. Stops at the limit, when you send a message, or on Abort. Only this chat.">
+      <input type="checkbox" id="keepgoing"> Keep going
+    </label>
+    <select id="keepmax" title="Most extra rounds per request when Keep going is on.">
+      <option value="3">3 rounds</option><option value="5" selected>5 rounds</option><option value="10">10 rounds</option><option value="20">20 rounds</option>
+    </select>
     <button type="button" id="stop">Abort</button>
     <button type="button" id="compact" title="Summarize older messages to free up room">Compact</button>
     <button type="button" id="reset" title="Start a fresh context. Old messages stay visible but Claude stops seeing them.">New context</button>

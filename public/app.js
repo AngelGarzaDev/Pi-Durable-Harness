@@ -1,5 +1,6 @@
 // Browser client: chat list, transcript, settings, and chat actions (send, steer, fork, reset, compact).
 import { reviewLine, isReviewContinuation } from "./review-view.js";
+import { keepGoingLine, isKeepGoingContinuation } from "./keep-going-view.js";
 import { answerMessage, questionHint } from "./ask-view.js";
 import { renderMarkdown, enhanceCode } from "./markdown-view.js";
 import { groupByFolder } from "./chat-order.js";
@@ -19,7 +20,9 @@ function blockText(content) {
 function items(entry) {
 	const review = reviewLine(entry);
 	if (review) return [{ cls: "review", label: "", text: review }];
-	if (isReviewContinuation(entry)) return [];
+	if (isReviewContinuation(entry) || isKeepGoingContinuation(entry)) return [];
+	const stop = keepGoingLine(entry);
+	if (stop) return [{ cls: "review", label: "", text: stop }];
 	const msgs = Array.isArray(entry.model) ? entry.model : [];
 	if (msgs.length === 0) return [{ cls: "other", label: entry.kind, text: "" }];
 	const result = [];
@@ -202,6 +205,7 @@ ws.onmessage = (e) => {
 		render(msg.view.entries);
 		showNotice(msg.notice);
 		showReview(msg.review);
+		showKeepGoing(msg.keepGoing);
 		lastQuestions = msg.questions ?? [];
 		renderQuestions(lastQuestions);
 	} else if (msg.type === "answer-result") {
@@ -213,6 +217,9 @@ ws.onmessage = (e) => {
 	} else if (msg.type === "review") {
 		showReview(msg);
 		settingsMsg.textContent = msg.on ? "Review is on for this chat." : "Review is off for this chat.";
+	} else if (msg.type === "keepgoing") {
+		showKeepGoing(msg);
+		settingsMsg.textContent = msg.on ? "Keep going is on for this chat." : "Keep going is off for this chat.";
 	} else if (msg.type === "open") {
 		openId = msg.conversationId;
 		// Opening a chat in a collapsed folder shows that folder, so the open chat is never hidden.
@@ -283,6 +290,16 @@ const reviewBox = document.getElementById("review");
 const reviewerSelect = document.getElementById("reviewer");
 reviewBox.onchange = () => ws.send(JSON.stringify({ type: "review", on: reviewBox.checked }));
 reviewerSelect.onchange = () => ws.send(JSON.stringify({ type: "review", reviewerModel: reviewerSelect.value }));
+
+// Keep going: the loop continues an answer until it ends with DONE, up to the chosen cap. Per chat.
+const keepBox = document.getElementById("keepgoing");
+const keepMax = document.getElementById("keepmax");
+keepBox.onchange = () => ws.send(JSON.stringify({ type: "keepgoing", on: keepBox.checked }));
+keepMax.onchange = () => ws.send(JSON.stringify({ type: "keepgoing", maxContinues: Number(keepMax.value) }));
+function showKeepGoing(k) {
+	keepBox.checked = !!k?.on;
+	keepMax.value = String(k?.maxContinues ?? 5);
+}
 function showReview(r) {
 	reviewBox.checked = !!r?.on;
 	reviewerSelect.value = r?.reviewerModel ?? "";
