@@ -1,28 +1,34 @@
-# STATE (2026-11-28)
+# STATE (handoff)
 
 ## Current task
-Runner internet access made the default (user m00826): DONE on dev, docs updated. Commit and push pending (see Status). Next after that: S2 (move the Anthropic key into the encrypted store), per docs/PLAN.md section "Plan: approval-gated push and GUI secrets".
+S2 done: browser-entered Anthropic key lives in the encrypted store (commit "S2: keep the browser-entered
+Anthropic key in the encrypted store ..."). Next: S3 (bundle push tool + approval page), see docs/DESIGN.md
+"Plan: approval-gated push and GUI secrets".
 
-## What was built recently
-- S1 secret store (src/secret-store.ts, WS secrets-* messages, Secrets panel, scripts/setup-secrets.sh, tests secret-store.test.ts and secrets-ws.test.ts). Commit d027b33.
-- Runner egress default: compose.yaml runner networks [tools, egress]; compose.internet.yaml is a no-op. Docs: README.md "Runner internet access", SECURITY.md, docs/DESIGN.md, docs/NOTES.md entry.
-- Staged folder upload (7ea571c), folder 15 MB pre-check removed (f73e809), git in runner image (eaf8c34).
+## Exact next step
+Open docs/DESIGN.md section for S3. Decide with the user first (open item a below) whether auth-set needs app-token
+re-auth. Then build S3 in small commits with tests.
 
-## Commands
-- Tests: `npm run typecheck && npm test` (214 pass).
-- Dev deploy: `docker compose up -d --build`; `curl -s http://127.0.0.1:8787/healthz` (ok).
-- Host setup for secrets: `scripts/setup-secrets.sh` (safe to re-run). A hand-made file needs `chcon -t container_file_t secrets/<file>` (SELinux, else EACCES).
-- Runner internet check: `docker compose exec runner node -e 'fetch("https://api.anthropic.com/")...'` (any HTTP status = reachable).
+## How to run and test
+- Typecheck: `npm run typecheck`; tests: `npm test` (223 pass as of S2).
+- Dev: `docker compose up -d --build` in durable-web/, then `curl -s http://127.0.0.1:8787/healthz` -> ok.
+- Live WS checks: login is POST /login with JSON {"token"}; then WebSocket /ws with the cookie.
 
-## Status
-- Dev: runner reaches the internet by default; app reaches runner (port 7000).
-- Prod (192.168.1.30:8790) still runs the old build and is tools-internal in deploy/production/compose.yaml (runner gets lan network there). Not deployed; needs go-ahead and an app-data backup first.
+## Known failures / gotchas
+- SELinux: secrets/master_key needs `chcon -t container_file_t` on enforcing hosts (setup-secrets.sh does this).
+- Earlier: model write then read of turn-test.txt gave ENOENT, not investigated.
+- Test files s1.txt-s3.txt, turnlimit.txt, turn-test.txt exist in the workspace; do not delete without approval.
 
-## Known failures / open
-- Earlier: model write then read of turn-test.txt gave ENOENT, never investigated.
-- Test chats and files (s1.txt–s3.txt, turnlimit.txt, turn-test.txt) remain; do not delete without approval.
-- Browser check of the Secrets panel and folder picker on dev not done.
+## Open items for the user (not blocking)
+a. Should changing the Anthropic key require app-token re-auth (DESIGN says yes; UI does not)?
+b. Prod deploy of S2, staged upload, folder pre-check removal, git, secret store, runner egress: needs go-ahead and an app-data backup.
+c. Raise the 15 MB per-file upload limit?
+d. Browser check of the Secrets panel and folder picker on dev not done.
+e. docs/NOTES.md still has old breaking-change wording (append-only log; decide).
+f. No automated test for steer, although docs/PLAN.md item 2.1 is ticked.
 
 ## Needs you
-- Whether to raise the 15 MB per-file upload limit.
-- Go-ahead to deploy staged upload, pre-check removal, git tool, secrets store and runner egress to prod (prod needs setup-secrets.sh first).
+- Rollback caveat (S2): a key saved after S2 is only in secrets.json; the pre-S2 build will not see it. Re-enter it or keep the Docker secret.
+
+## Blocked
+- None.
