@@ -6,7 +6,7 @@ Folder upload (user m00418 "Let's add the ability to upload folders not just fil
 ## Done this session
 - Uploads (files) from earlier: src/uploads.ts, POST /upload (src/server.ts), POST /v1/upload (runner/server.ts). Prod has files-only uploads at 23c1db1.
 - Folder upload: src/uploads.ts sanitizeRelativePath (max 8 folder levels, refuses "", ".", "..", bad parts). Browser sends x-relative-path; server keeps folder structure under the target; runner unchanged (already mkdirs).
-- UI: "Folder" button in chat composer (inserts the saved folder path into the message) and a folder picker in the workspace dialog (public/index.html, public/app.js uploadFolder). Max 2000 files per folder pick.
+- UI: "Folder" button in chat composer (inserts the saved folder path into the message) and a folder picker in the workspace dialog (public/index.html, public/app.js uploadFolder). Folder limit is now 2 GB total (no file count cap); Cancel upload button stops after the current file.
 - tests/upload.test.ts: sanitizeRelativePath unit test, nested folder upload, unsafe path refused. Full suite 183 pass; typecheck ok.
 
 ## Next step

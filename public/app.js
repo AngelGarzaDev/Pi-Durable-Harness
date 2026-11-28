@@ -276,7 +276,16 @@ document.getElementById("steer").onclick = () => send("steer");
 
 // File uploads. The server saves each file under a safe name and returns its path in the workspace.
 const MAX_UPLOAD = 15 * 1024 * 1024;
-const MAX_FOLDER_FILES = 2000;
+// A whole folder is limited by its total size, not its file count. Files are still sent one request each.
+const MAX_FOLDER_BYTES = 2 * 1024 * 1024 * 1024;
+let uploadCancelled = false;
+function cancelUpload() {
+	uploadCancelled = true;
+}
+for (const b of document.querySelectorAll(".uploadcancel")) b.onclick = cancelUpload;
+function setUploadBusy(busy) {
+	for (const b of document.querySelectorAll(".uploadcancel")) b.hidden = !busy;
+}
 // rel: the file's path inside a picked folder (sent as x-relative-path so the server creates the folders).
 async function uploadFile(file, query, rel) {
 	if (file.size > MAX_UPLOAD) return { ok: false, error: file.name + " is too large (15 MB limit)." };
@@ -289,27 +298,38 @@ async function uploadFile(file, query, rel) {
 // and where it was saved in the workspace (folderPath, from the first saved file).
 async function uploadFolder(files, query, onProgress) {
 	const list = Array.from(files);
-	if (list.length > MAX_FOLDER_FILES) return { saved: 0, failed: [], error: "The folder has more than " + MAX_FOLDER_FILES + " files. Upload part of it." };
+	const bytes = list.reduce((sum, f) => sum + f.size, 0);
+	if (bytes > MAX_FOLDER_BYTES) return { saved: 0, failed: [], error: "The folder is " + (bytes / 1024 ** 3).toFixed(2) + " GB, over the 2 GB limit. Upload part of it." };
 	const top = list.length ? list[0].webkitRelativePath.split("/")[0] : "";
 	let saved = 0;
 	let folderPath = "";
 	const failed = [];
-	for (let i = 0; i < list.length; i++) {
-		onProgress(i + 1, list.length);
-		const f = list[i];
-		const res = await uploadFile(f, query, f.webkitRelativePath || f.name);
-		if (res.ok) {
-			saved++;
-			// The saved path is .../<top>/...; the folder is everything up to and including <top>.
-			const at = res.path.indexOf("/" + top + "/");
-			if (folderPath === "" && at >= 0) folderPath = res.path.slice(0, at + top.length + 1);
-		} else failed.push(f.webkitRelativePath || f.name);
+	uploadCancelled = false;
+	setUploadBusy(true);
+	let i = 0;
+	try {
+		for (; i < list.length; i++) {
+			if (uploadCancelled) break;
+			onProgress(i + 1, list.length);
+			const f = list[i];
+			const res = await uploadFile(f, query, f.webkitRelativePath || f.name);
+			if (res.ok) {
+				saved++;
+				// The saved path is .../<top>/...; the folder is everything up to and including <top>.
+				const at = res.path.indexOf("/" + top + "/");
+				if (folderPath === "" && at >= 0) folderPath = res.path.slice(0, at + top.length + 1);
+			} else failed.push(f.webkitRelativePath || f.name);
+		}
+	} finally {
+		setUploadBusy(false);
 	}
-	return { saved, failed, top, folderPath };
+	const cancelled = i < list.length;
+	return { saved, failed, top, folderPath, cancelled, skipped: list.length - i };
 }
 function folderSummary(res) {
 	const more = res.failed.length ? " " + res.failed.length + " could not be saved: " + res.failed.slice(0, 5).join(", ") + (res.failed.length > 5 ? " and more" : "") + "." : "";
-	return "Saved " + res.saved + " file(s) from " + res.top + "." + more;
+	const stop = res.cancelled ? "Upload cancelled; " + res.skipped + " file(s) not sent. " : "";
+	return stop + "Saved " + res.saved + " file(s) from " + res.top + "." + more;
 }
 document.getElementById("attach").onclick = () => document.getElementById("attachfile").click();
 document.getElementById("attachdir").onclick = () => document.getElementById("attachdirpick").click();

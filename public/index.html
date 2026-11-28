@@ -177,7 +177,7 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     <h3>Upload files or a folder to this workspace</h3>
     <p class="muted">Files are saved in the workspace folder. If a name is taken, it is saved as name-2, name-3 and so on. Up to 15 MB per file. A folder keeps its structure inside the workspace folder; files that already exist get the -2 names.</p>
     <div class="row"><input type="file" id="wsupload" multiple> <span id="wsuploadmsg"></span></div>
-    <div class="row"><label>Folder <input type="file" id="wsuploaddir" webkitdirectory multiple></label></div>
+    <div class="row"><label>Folder <input type="file" id="wsuploaddir" webkitdirectory multiple></label> <button type="button" class="uploadcancel" hidden>Cancel upload</button></div>
   </form>
   <div id="wsfooter">
     <span class="muted">Saves both sections above.</span>
@@ -252,6 +252,7 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     </form>
   </details>
   <div id="notice" class="notice" hidden></div>
+  <button type="button" class="uploadcancel" hidden>Cancel upload</button>
   <div id="transcript"></div>
   <div id="questions"></div>
   <form id="f" class="bar" autocomplete="off">
