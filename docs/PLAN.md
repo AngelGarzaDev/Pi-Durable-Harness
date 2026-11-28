@@ -8,7 +8,7 @@
 - [x] 1.4 Live check with claude-haiku-5-5 at 100000 tokens, using docs/templates if large text is needed. Log in NOTES.md.
 
 ## Goal 2: steer timing
-- [x] 2.1 Test: steer sent during a multi-step run is recorded and acknowledged (mock or haiku live check).
+- [x] 2.1 Test: steer sent during a multi-step run is recorded and acknowledged (mock or haiku live check). Added 2026-11-28 as tests/steer.test.ts (faux model, run parked on ask_user); the earlier tick was made without a test.
 - [x] 2.2 UI tooltip and docs/NOTES.md: steer joins after the current tool step.
 
 ## Goal 3: review tasks (design in root PLAN.md "Plan: review tasks")

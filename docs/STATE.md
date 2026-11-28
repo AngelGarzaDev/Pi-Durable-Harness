@@ -1,34 +1,38 @@
 # STATE (handoff)
 
 ## Current task
-S2 done: browser-entered Anthropic key lives in the encrypted store (commit "S2: keep the browser-entered
-Anthropic key in the encrypted store ..."). Next: S3 (bundle push tool + approval page), see docs/DESIGN.md
-"Plan: approval-gated push and GUI secrets".
+Goal (f) steer test: DONE (tests/steer.test.ts, docs/NOTES.md entry, tooltip checked). Next: S3 (bundle push tool +
+approval page) per docs/DESIGN.md "Plan: approval-gated push and GUI secrets". Before S3, the open item below.
 
 ## Exact next step
-Open docs/DESIGN.md section for S3. Decide with the user first (open item a below) whether auth-set needs app-token
-re-auth. Then build S3 in small commits with tests.
+Read docs/DESIGN.md section for S3, then build S3 in small commits with tests. Remember: pushes after each tested
+step (AGENTS.md), no secrets in git, prod untouched (user said leave it).
 
 ## How to run and test
-- Typecheck: `npm run typecheck`; tests: `npm test` (223 pass as of S2).
+- Typecheck: `npm run typecheck`; tests: `npm test` (227 pass as of steer test).
 - Dev: `docker compose up -d --build` in durable-web/, then `curl -s http://127.0.0.1:8787/healthz` -> ok.
-- Live WS checks: login is POST /login with JSON {"token"}; then WebSocket /ws with the cookie.
+- Live WS: login is POST /login with JSON {"token"}; then WS /ws with the cookie.
+- Push: temporary askpass script in /tmp (recipe in AGENTS.md), delete afterwards.
+
+## Done this session (all pushed to origin/main)
+- S2 Anthropic key in encrypted store (68ba9d0, 4f29acb).
+- Per-file upload limit removed; runner streams and picks names (b645580, 7fe36d6). Dev live check: 20 MB upload ok.
+- Breaking-change wording removed from docs/NOTES.md.
+- Steer test (f) added and verified (tests/steer.test.ts).
 
 ## Known failures / gotchas
 - SELinux: secrets/master_key needs `chcon -t container_file_t` on enforcing hosts (setup-secrets.sh does this).
-- Earlier: model write then read of turn-test.txt gave ENOENT, not investigated.
+- Earlier: model write then read of turn-test.txt gave ENOENT (explained in NOTES: concurrent tool calls in one message).
 - Test files s1.txt-s3.txt, turnlimit.txt, turn-test.txt exist in the workspace; do not delete without approval.
+- Dev workspace has /workspace/uploads from upload checks; live proof file was removed.
 
-## Open items for the user (not blocking)
-a. Should changing the Anthropic key require app-token re-auth (DESIGN says yes; UI does not)?
-b. Prod deploy of S2, staged upload, folder pre-check removal, git, secret store, runner egress: needs go-ahead and an app-data backup.
-c. (Done in this change) per-file upload limit removed.
-d. Browser check of the Secrets panel and folder picker on dev not done.
-e. docs/NOTES.md still has old breaking-change wording (append-only log; decide).
-f. No automated test for steer, although docs/PLAN.md item 2.1 is ticked.
+## Open items for the user
+- Folder picker browser check on dev not done (secret panel is confirmed working).
+- Prod still runs the older build (user: leave prod alone for now).
+- Steer test covers Pi Durable behaviour; the WS path (server.ts whenBusy mapping) is not tested end to end.
 
 ## Needs you
-- Rollback caveat (S2): a key saved after S2 is only in secrets.json; the pre-S2 build will not see it. Re-enter it or keep the Docker secret.
+- Rollback caveat (S2): a key saved after S2 exists only in secrets.json; the pre-S2 build will not see it.
 
 ## Blocked
 - None.
