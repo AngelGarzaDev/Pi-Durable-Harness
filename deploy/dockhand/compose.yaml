@@ -1,0 +1,88 @@
+# Dockhand stack: ONE self-contained compose file (mirrors deploy/production/compose.yaml).
+# Dockhand reads only this text, so there are no relative paths and no ./ files:
+#  - images are built from the git repo (build context is a URL; the repo must be pushed first),
+#  - secrets are absolute host paths. Create them once on the host (mode 600, owner = the uid below).
+#  - HOST_UID/HOST_GID are fixed below; change them if the host user differs.
+# Before first deploy: docs/DOCKHAND.md. Do not use `docker compose down -v` on this stack.
+name: pi-durable-dockhand
+
+x-build-args: &build-args
+  APP_UID: "1000"
+  APP_GID: "1000"
+
+services:
+  app:
+    build:
+      context: https://github.com/AngelGarzaDev/Pi-Durable-Harness.git#main:durable-web
+      target: app
+      args: *build-args
+    image: pi-durable-dockhand-app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATA_DIR: /data
+      RUNNER_URL: http://runner:7000
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      APP_TOKEN_FILE: /run/secrets/app_token
+      RUNNER_TOKEN_FILE: /run/secrets/runner_token
+      ANTHROPIC_MODEL: claude-haiku-5-5
+    secrets: [anthropic_api_key, app_token, runner_token]
+    volumes: ["app-data:/data"]
+    ports: ["192.168.1.30:8790:8787"]   # LAN address of this host, as in production
+    networks: [edge, tools]
+    depends_on:
+      runner: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  runner:
+    build:
+      context: https://github.com/AngelGarzaDev/Pi-Durable-Harness.git#main:durable-web
+      target: runner
+      args: *build-args
+    image: pi-durable-dockhand-runner:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      RUNNER_HOST: 0.0.0.0
+      RUNNER_PORT: "7000"
+      WORKSPACE_DIR: /workspace
+      RUNNER_TOKEN_FILE: /run/secrets/runner_token
+    secrets: [runner_token]
+    volumes: ["workspace:/workspace"]
+    networks: [tools, lan]   # lan: same accepted LAN risk as production (docs/PRODUCTION.md)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  edge: {}
+  tools: { internal: true }
+  lan: {}
+
+secrets:
+  anthropic_api_key:
+    file: /var/home/angel/Pi/host/durable-web/deploy/production/secrets/anthropic_api_key
+  app_token:
+    file: /var/home/angel/Pi/host/durable-web/deploy/production/secrets/app_token
+  runner_token:
+    file: /var/home/angel/Pi/host/durable-web/deploy/production/secrets/runner_token
+
+volumes:
+  app-data:
+    name: pi-durable-dockhand_app-data
+  workspace:
+    name: pi-durable-dockhand_workspace
