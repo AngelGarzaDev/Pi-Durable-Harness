@@ -227,6 +227,11 @@ Secrets you enter in the browser, such as a GitHub token, are stored in `DATA_DI
 encrypted with AES-256-GCM using `secrets/master_key`. Values are write-only: once saved, they are never shown
 again. Each change is recorded in `DATA_DIR/secrets-audit.log`, without the value.
 
+A key you save in the Anthropic key section of the settings is stored here too (under the name
+`anthropic_api_key`), not in plain text. The generic Secrets panel does not show or change that entry. A key saved
+before the store existed stays in `DATA_DIR/credentials.json` and keeps working; saving a new key removes the
+plaintext copy. Without `secrets/master_key` the store is off and keys are kept as before.
+
 To change a secret, open the Secrets panel in the global settings and enter the app token. Changes are allowed
 for 5 minutes after you enter it.
 

@@ -4,7 +4,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { WebSocket } from "ws";
@@ -121,4 +121,37 @@ test("the audit log records each attempt with no values", () => {
 	assert.ok(lines.some((l) => l.action === "remove" && l.name === "github_token" && l.outcome === "ok"));
 	assert.equal(log.includes(SECRET_VALUE), false);
 	assert.equal(log.includes(TOKEN), false, "the app token is never logged");
+});
+
+// The Anthropic key shares the store but has its own section in the UI, so the generic panel must not touch it.
+const ANTHROPIC_KEY = "sk-ant-test-ws-key-9999";
+
+test("the generic secret panel refuses the reserved Anthropic name", async () => {
+	const set = await ask({ type: "secrets-set", name: "anthropic_api_key", value: "x".repeat(20) }, "error");
+	assert.match(set.message, /Anthropic key section/);
+	const removed = await ask({ type: "secrets-remove", name: "anthropic_api_key" }, "error");
+	assert.match(removed.message, /Anthropic key section/);
+});
+
+test("saving the Anthropic key stores it encrypted, hides it from the panel, and clearing removes it", async () => {
+	const saved = await ask({ type: "auth-set", key: ANTHROPIC_KEY }, "auth");
+	assert.deepEqual(saved.anthropic, { source: "browser", hint: "…9999" });
+	const listed = await ask({ type: "secrets-list" }, "secrets");
+	assert.equal(listed.names.some((s: any) => s.name === "anthropic_api_key"), false);
+	const onDisk = readFileSync(join(dataDir, "secrets.json"), "utf8");
+	assert.equal(onDisk.includes("anthropic_api_key"), true);
+	assert.equal(onDisk.includes(ANTHROPIC_KEY), false, "store holds no plaintext key");
+	// credentials.json may not exist at all once the key is in the store; if it does, it must not hold the key.
+	const legacyPath = join(dataDir, "credentials.json");
+	const legacyText = existsSync(legacyPath) ? readFileSync(legacyPath, "utf8") : "";
+	assert.equal(legacyText.includes(ANTHROPIC_KEY), false, "no plaintext copy in credentials.json");
+	const cleared = await ask({ type: "auth-clear" }, "auth");
+	assert.equal(cleared.anthropic.source, "secret");
+	assert.equal(JSON.parse(readFileSync(join(dataDir, "secrets.json"), "utf8")).secrets?.anthropic_api_key, undefined);
+});
+
+test("the audit log records Anthropic key changes without the key", () => {
+	const log = readFileSync(join(dataDir, "secrets-audit.log"), "utf8");
+	assert.ok(log.split("\n").some((l) => l.includes('"name":"anthropic_api_key"') && l.includes('"action":"set"')));
+	assert.equal(log.includes(ANTHROPIC_KEY), false);
 });

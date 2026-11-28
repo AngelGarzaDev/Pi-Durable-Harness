@@ -21,7 +21,7 @@ import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./
 import { AGENTS_FILE, AGENTS_HEADER, AGENTS_MAX_CHARS, combineInstructions, readFolderAgents, stripLegacyBlock } from "./agents-md.js";
 import { STAGE_ID_RE, STAGING_DIR, UPLOAD_MAX_BYTES, UPLOAD_MAX_TRIES, candidateName, newStageId, sanitizeRelativePath, sanitizeUploadName } from "./uploads.js";
 import { randomBytes } from "node:crypto";
-import { SecretStore, auditSecret, isReauthed, readMasterKey } from "./secret-store.js";
+import { ANTHROPIC_SECRET_NAME, auditSecret, isReauthed } from "./secret-store.js";
 import { WORKSPACE_ROOT, checkFolderName, folderPath, loadChatFolders, saveChatFolders, type ChatFolders } from "./chat-folder.js";
 import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
 import { FolderRules, loadLegacyRules, saveLegacyRules } from "./folder-rules.js";
@@ -71,8 +71,7 @@ type ClientMessage =
 const config = loadConfig();
 const accessToken = readAccessToken(config.tokenFile);
 // Encrypted secret store. Disabled (undefined) when the master key file is absent, so the app still starts.
-const secretStore = existsSync(config.masterKeyFile) ? new SecretStore(config.dataDir, readMasterKey(config.masterKeyFile)) : undefined;
-const { harness, root, models, settings: initialSettings, reviews, keepGoing, credentials, secretKey, mcp, runnerUrl, runnerToken } = await openHarness(config);
+const { harness, root, models, settings: initialSettings, reviews, keepGoing, credentials, secretStore, secretKey, mcp, runnerUrl, runnerToken } = await openHarness(config);
 let settings: ChatSettings = initialSettings;
 // The root chat is configured at startup without its own instructions, so apply them here if it has any.
 const titles: Titles = loadTitles(config.dataDir);
@@ -594,7 +593,7 @@ wss.on("connection", async (socket: WebSocket) => {
 
 	// Re-entering the app token opens a 5 minute window for secret changes. It is per socket, so a new login starts closed.
 	let reauthAt: number | undefined;
-	const secretsReply = () => ({ type: "secrets", available: secretStore !== undefined, names: secretStore?.list() ?? [], reauthed: isReauthed(reauthAt, Date.now()) });
+	const secretsReply = () => ({ type: "secrets", available: secretStore !== undefined, names: secretStore?.list().filter((s) => s.name !== ANTHROPIC_SECRET_NAME) ?? [], reauthed: isReauthed(reauthAt, Date.now()) });
 
 	socket.on("message", async (raw) => {
 		let msg: ClientMessage;
@@ -777,9 +776,11 @@ wss.on("connection", async (socket: WebSocket) => {
 				const problem = checkKeyFormat(key);
 				if (problem) return send({ type: "error", message: problem });
 				await setAnthropicKey(models, key);
+				auditSecret(config.dataDir, { action: "set", name: ANTHROPIC_SECRET_NAME, outcome: "ok" });
 				send({ type: "auth", anthropic: await anthropicStatus(credentials, secretKey) });
 			} else if (msg.type === "auth-clear") {
 				await clearAnthropicKey(models);
+				auditSecret(config.dataDir, { action: "remove", name: ANTHROPIC_SECRET_NAME, outcome: "ok" });
 				send({ type: "auth", anthropic: await anthropicStatus(credentials, secretKey) });
 			} else if (msg.type === "secrets-list") {
 				send(secretsReply());
@@ -795,6 +796,7 @@ wss.on("connection", async (socket: WebSocket) => {
 			} else if (msg.type === "secrets-set" || msg.type === "secrets-remove") {
 				const name = typeof msg.name === "string" ? msg.name : "";
 				if (!secretStore) return send({ type: "error", message: "The secret store is off: the master key file is missing on this host." });
+				if (name === ANTHROPIC_SECRET_NAME) return send({ type: "error", message: "The Anthropic key is changed in the Anthropic key section, not here." });
 				if (!isReauthed(reauthAt, Date.now())) {
 					auditSecret(config.dataDir, { action: msg.type === "secrets-set" ? "set" : "remove", name, outcome: "refused", detail: "not re-authenticated" });
 					return send({ type: "error", message: "Enter the app token again to change secrets." });

@@ -121,3 +121,12 @@ export function auditSecret(dataDir: string, entry: { action: "set" | "remove" |
 	const line = JSON.stringify({ time: now.toISOString(), ...entry }) + "\n";
 	appendFileSync(auditFile(dataDir), line, { mode: 0o600 });
 }
+
+// The Anthropic key lives in the store under this name once it is saved from the browser (src/credentials.ts).
+// The generic secrets panel does not show it, set it or remove it, so the two paths cannot disagree.
+export const ANTHROPIC_SECRET_NAME = "anthropic_api_key";
+
+// The store, or undefined when the master key file is missing (the feature is then off and nothing changes).
+export function openSecretStore(dataDir: string, masterKeyFile: string): SecretStore | undefined {
+	return existsSync(masterKeyFile) ? new SecretStore(dataDir, readMasterKey(masterKeyFile)) : undefined;
+}

@@ -16,7 +16,8 @@ import { ReviewSettings, reviewExtension } from "./review.js";
 import { KeepGoingSettings, keepGoingExtension } from "./keep-going-hook.js";
 import { KEEP_GOING_PROMPT } from "./keep-going.js";
 import { askExtension } from "./ask.js";
-import { FileCredentialStore } from "./credentials.js";
+import { FileCredentialStore, LayeredCredentialStore } from "./credentials.js";
+import { openSecretStore } from "./secret-store.js";
 import { McpManager } from "./mcp.js";
 import { webSearchServer } from "./web-search.js";
 
@@ -40,7 +41,9 @@ export async function openHarness(config: Config) {
 	const runnerToken = readRunnerToken(config.runnerTokenFile);
 	// A key entered in the browser (stored in the data dir) wins over the Docker secret, so the secret is optional
 	// once a browser key exists. Neither key is ever logged.
-	const credentials = new FileCredentialStore(join(config.dataDir, "credentials.json"));
+	// The Anthropic key goes to the encrypted store when a master key exists; everything else stays in credentials.json.
+	const secretStore = openSecretStore(config.dataDir, config.masterKeyFile);
+	const credentials = new LayeredCredentialStore(new FileCredentialStore(join(config.dataDir, "credentials.json")), secretStore);
 	const secretKey = readOptionalApiKey(config.apiKeyFile);
 	// pi-ai's Anthropic provider reads ANTHROPIC_API_KEY from the environment; it stays in this process only.
 	if (secretKey) process.env.ANTHROPIC_API_KEY = secretKey;
@@ -78,7 +81,7 @@ export async function openHarness(config: Config) {
 	});
 	await applySettings(root, models, settings);
 	harness.resume(); // continue any run the last process left unfinished
-	return { harness, root, models, settings, reviews, keepGoing, credentials, secretKey: secretKey !== undefined, mcp, mcpErrors, runnerUrl: config.runnerUrl, runnerToken };
+	return { harness, root, models, settings, reviews, keepGoing, credentials, secretStore, secretKey: secretKey !== undefined, mcp, mcpErrors, runnerUrl: config.runnerUrl, runnerToken };
 }
 
 // Chat models the browser can pick, from the pi-ai catalog.

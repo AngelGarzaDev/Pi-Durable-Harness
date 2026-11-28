@@ -164,9 +164,11 @@ Status: design only, not built. The app is reachable only on the LAN.
 
 ## Planned: moving secrets out of Docker secret files
 
-Status: the encrypted secret store and its browser panel are built. Not yet done:
+Status: the encrypted secret store and its browser panel are built. The browser-entered Anthropic key is now kept
+in the store (`LayeredCredentialStore` in `src/credentials.ts`); older plaintext keys are still read and are
+replaced on the next save. Not yet done:
 
-- Moving the Anthropic key into the store. The Docker secret stays as the fallback until the store has been verified.
+- The Docker secret stays as the fallback until the store has been verified on each host.
 - Removing the Docker secret files from `compose.yaml` after that.
 
 The store encrypts each value with AES-256-GCM, using a 32-byte master key on the host (`secrets/master_key`, mode 600).
