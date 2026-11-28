@@ -104,3 +104,29 @@ test("upload refuses paths outside the workspace and bad try counts", async () =
 	assert.equal((await up("/workspace/a.txt", 0, "x")).status, 400);
 	assert.equal((await up("/workspace/a.txt", 51, "x")).status, 400);
 });
+
+test("git bundle: main is bundled from the workspace; other branches, no repo and no token are refused", async () => {
+	const auth = { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" };
+	const ask = (body: unknown) => fetch(`${BASE}/v1/git/bundle`, { method: "POST", headers: auth, body: JSON.stringify(body) });
+	// Before a repo exists there is no main to bundle.
+	const none = await ask({ branch: "main" });
+	assert.equal(none.status, 422);
+	assert.match(((await none.json()) as { error: string }).error, /no repository or no main branch/);
+	// A real repo with one commit on main.
+	// The runner bundles the workspace root itself, so the repo is the workspace.
+	const repo = workspace;
+	const { execFileSync } = await import("node:child_process");
+	const g = (args: string[]) => execFileSync("git", ["-c", "user.name=T", "-c", "user.email=t@e", "-c", "init.defaultBranch=main", ...args], { cwd: repo, stdio: "ignore" });
+	g(["init", "-q", "-b", "main"]);
+	writeFileSync(join(repo, "f.txt"), "bundled");
+	g(["add", "f.txt"]);
+	g(["commit", "-q", "-m", "bundle me"]);
+	const ok = await ask({ branch: "main" });
+	assert.equal(ok.status, 200);
+	assert.equal(ok.headers.get("content-type"), "application/octet-stream");
+	const bytes = Buffer.from(await ok.arrayBuffer());
+	assert.equal(bytes.subarray(0, 15).toString(), "# v2 git bundle");
+	const refused = await ask({ branch: "dev" });
+	assert.equal(refused.status, 400);
+	assert.equal((await fetch(`${BASE}/v1/git/bundle`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 401);
+});

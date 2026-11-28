@@ -2,6 +2,7 @@
 import { reviewLine, isReviewContinuation } from "./review-view.js";
 import { keepGoingLine, isKeepGoingContinuation } from "./keep-going-view.js";
 import { answerMessage, questionHint } from "./ask-view.js";
+import { pushDecisionMessage, pushSummaryLine, commitLine, fileLine } from "./push-view.js";
 import { renderMarkdown, enhanceCode } from "./markdown-view.js";
 import { groupByFolder } from "./chat-order.js";
 const ws = new WebSocket(`ws://${location.host}/ws`);
@@ -55,8 +56,50 @@ function showNotice(text) {
 const answered = new Set();
 let lastQuestions = [];
 const questionsEl = document.getElementById("questions");
+// Approval cards for git_push: one per waiting push. Nothing is pushed until Approve is clicked.
+const decided = new Set();
+let lastPushes = [];
+function renderPushes(pushes) {
+	questionsEl.querySelectorAll(".push-card").forEach((el) => el.remove());
+	for (const p of pushes ?? []) {
+		if (decided.has(p.key)) continue;
+		const card = document.createElement("div");
+		card.className = "question push-card";
+		const head = document.createElement("div");
+		head.className = "question-text";
+		head.textContent = pushSummaryLine(p);
+		card.appendChild(head);
+		if (p.reason) {
+			const why = document.createElement("div");
+			why.className = "question-hint";
+			why.textContent = `Reason: ${p.reason}`;
+			card.appendChild(why);
+		}
+		const list = document.createElement("pre");
+		list.className = "push-list";
+		list.textContent = [...(p.commits ?? []).map(commitLine), "", ...(p.files ?? []).map(fileLine)].join("\n");
+		card.appendChild(list);
+		const row = document.createElement("div");
+		row.className = "question-options";
+		for (const [label, approve] of [["Approve push", true], ["Reject", false]]) {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.textContent = label;
+			b.onclick = () => {
+				const msg = pushDecisionMessage(p, approve);
+				if (!msg) return;
+				decided.add(p.key);
+				ws.send(JSON.stringify(msg));
+				renderPushes(lastPushes);
+			};
+			row.appendChild(b);
+		}
+		card.appendChild(row);
+		questionsEl.prepend(card);
+	}
+}
 function renderQuestions(questions) {
-	questionsEl.textContent = "";
+	questionsEl.querySelectorAll(".question:not(.push-card)").forEach((el) => el.remove());
 	for (const q of questions ?? []) {
 		const card = document.createElement("div");
 		card.className = "question";
@@ -209,6 +252,14 @@ ws.onmessage = (e) => {
 		showKeepGoing(msg.keepGoing);
 		lastQuestions = msg.questions ?? [];
 		renderQuestions(lastQuestions);
+		lastPushes = msg.pushes ?? [];
+		renderPushes(lastPushes);
+	} else if (msg.type === "push-result") {
+		if (!msg.ok) {
+			decided.delete(msg.key);
+			status.textContent = msg.error;
+			renderPushes(lastPushes);
+		}
 	} else if (msg.type === "answer-result") {
 		if (!msg.ok) {
 			answered.delete(msg.key);

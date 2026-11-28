@@ -104,6 +104,6 @@ Stop rules to implement: the model says DONE (marker agreed in the prompt), max 
 - [x] S1.4 Secrets panel in global settings (names and times only; unlock form; set and remove).
 - [x] S1.5 Dev deploy and live WS check (set/refuse/remove, audit, no plaintext on disk).
 - [ ] S2 Move the Anthropic key into the store (replace credentials.json plaintext path; keep Docker secret fallback).
-- [ ] S3 Bundle push tool: runner makes git bundle, app stores it, approval page lists commits and file names, app pushes main only after click. Policy tests.
+- [x] S3 Bundle push tool: runner makes git bundle, app stores it, approval page lists commits and file names, app pushes main only after click. Policy tests.
 - [ ] S4 Deploy dev, then new prod host (backup app-data first; one SSH step for master key and app token).
 

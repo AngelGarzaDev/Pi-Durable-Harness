@@ -6,6 +6,7 @@ import { basename, dirname, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { randomBytes, randomUUID } from "node:crypto";
 import { bearerMatches, insideRoot } from "./guard.js";
+import { makeMainBundle } from "./git-bundle.js";
 import { commitStaged, discardStaged, STAGE_MAX_AGE_MS, sweepStaging, type StageResult } from "./staging.js";
 import { callTool, listTools, startServer, stopServer, stopAll } from "./mcp.js";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
@@ -172,6 +173,14 @@ function send(res: ServerResponse, status: number, body: unknown) {
 	res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
 }
 
+// Approval-gated push: a bundle of main for the app to check and, after approval, push. Branch must be main.
+async function handleGitBundle(body: { branch?: unknown }, res: ServerResponse) {
+	if (body?.branch !== "main") return send(res, 400, { ok: false, error: "Only the main branch can be pushed." });
+	const made = await makeMainBundle(WORKSPACE);
+	if (!made.ok) return send(res, made.status, { ok: false, error: made.error });
+	res.writeHead(200, { "content-type": "application/octet-stream", "content-length": String(made.bytes.length) }).end(made.bytes);
+}
+
 async function handleCall(body: { method: string; args: unknown[] }) {
 	if (typeof body.method !== "string" || !Object.hasOwn(CALLS, body.method)) {
 		return { ok: false, error: { kind: "file", code: "not_supported", message: `unknown method ${String(body.method)}` } };
@@ -269,6 +278,7 @@ createServer(async (req, res) => {
 		if (url.pathname === "/v1/upload") return await handleUpload(req, res);
 		if (url.pathname === "/v1/stage/commit") return send(res, 200, stageReply(handleStageCommit(await readBody(req))));
 		if (url.pathname === "/v1/stage/discard") return send(res, 200, stageReply(handleStageDiscard(await readBody(req))));
+		if (url.pathname === "/v1/git/bundle") return await handleGitBundle(await readBody(req), res);
 		if (url.pathname === "/v1/call") return send(res, 200, await handleCall(await readBody(req)));
 		if (url.pathname === "/v1/reader/open") return send(res, 200, await handleOpenReader(await readBody(req)));
 		if (url.pathname === "/v1/reader") return send(res, 200, await handleReaderOp(await readBody(req)));

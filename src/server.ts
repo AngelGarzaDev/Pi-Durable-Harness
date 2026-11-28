@@ -7,6 +7,7 @@ import { clampMaxContinues } from "./keep-going.js";
 import { MAX_API_BODY, completionBody, errorBody, latestAnswer, modelList, parseChatRequest } from "./openai-api.js";
 import { failureNotice } from "./notice.js";
 import { AnswerSignal, checkAnswer, pendingQuestions } from "./ask.js";
+import { PushDecisionSignal, pendingPushes } from "./push-approval.js";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +55,7 @@ type ClientMessage =
 	| { type: "keepgoing"; on?: boolean; maxContinues?: number | null }
 	// An answer to a question the model asked (ask_user). taskId and key must match a question shown in the open chat.
 	| { type: "answer"; taskId: number; key: string; text: string }
+	| { type: "push-decide"; taskId: number; key: string; approve: boolean }
 	// Anthropic key from the browser. The key is only ever sent TO the server; no message returns it.
 	| { type: "auth-status" }
 	| { type: "auth-set"; key: string }
@@ -565,10 +567,10 @@ wss.on("connection", async (socket: WebSocket) => {
 		active = conv;
 		watch = await conv.watch(context);
 		watch.start(async (call) => {
-			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id), keepGoing: keepGoing.get(conv.id), questions: pendingQuestions(call.value.docs) });
+			if (call.kind === "value") send({ type: "view", view: call.value, conversationId: conv.id, notice: failureNotice(call.value.docs), review: reviews.get(conv.id), keepGoing: keepGoing.get(conv.id), questions: pendingQuestions(call.value.docs), pushes: pendingPushes(call.value.docs) });
 			else send({ type: "error", message: publicError(call) });
 		});
-		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id), keepGoing: keepGoing.get(conv.id), questions: pendingQuestions(watch.value.docs) });
+		send({ type: "view", view: watch.value, conversationId: conv.id, notice: failureNotice(watch.value.docs), review: reviews.get(conv.id), keepGoing: keepGoing.get(conv.id), questions: pendingQuestions(watch.value.docs), pushes: pendingPushes(watch.value.docs) });
 		// modelInstructions is what the resolved agent sends to the model (rules, then the chat's text).
 		const agent = await conv.agent(context);
 		send({ type: "open", conversationId: conv.id, title: titles[String(conv.id)] ?? (conv.id === root.id ? "Main chat" : "Chat"), instructions: chatInstructions[String(conv.id)] ?? "", modelInstructions: agent.instructions ?? "", folder: chatFolders[String(conv.id)] ?? "" });
@@ -757,6 +759,14 @@ wss.on("connection", async (socket: WebSocket) => {
 				const result = await harness.signal(msg.taskId as unknown as TaskId, AnswerSignal, msg.key, { text: checked.text }, context);
 				if (result === "delivered") send({ type: "answer-result", ok: true, taskId: msg.taskId, key: msg.key });
 				else send({ type: "answer-result", ok: false, taskId: msg.taskId, key: msg.key, error: "The question was already answered or has closed." });
+			} else if (msg.type === "push-decide") {
+				// Only a push that is waiting for approval in this chat can be decided. The app pushes; the runner never does.
+				const open = pendingPushes(watch?.value.docs);
+				const push = open.find((p) => p.taskId === msg.taskId && p.key === msg.key);
+				if (!push) return send({ type: "push-result", ok: false, taskId: msg.taskId, key: msg.key, error: "That push is no longer waiting for approval." });
+				const result = await harness.signal(msg.taskId as unknown as TaskId, PushDecisionSignal, msg.key, { approve: msg.approve === true }, context);
+				if (result === "delivered") send({ type: "push-result", ok: true, taskId: msg.taskId, key: msg.key, approve: msg.approve === true });
+				else send({ type: "push-result", ok: false, taskId: msg.taskId, key: msg.key, error: "The push was already decided or has closed." });
 			} else if (msg.type === "compact") {
 				await active.compact(typeof msg.instructions === "string" ? msg.instructions : undefined, context);
 			} else if (msg.type === "auth-status") {

@@ -20,6 +20,7 @@ services:
       DATA_DIR: /data
       RUNNER_URL: http://runner:7000
       ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      GIT_REMOTE_URL: ${GIT_REMOTE_URL:-}
       APP_TOKEN_FILE: /run/secrets/app_token
       RUNNER_TOKEN_FILE: /run/secrets/runner_token
       MASTER_KEY_FILE: /run/secrets/master_key

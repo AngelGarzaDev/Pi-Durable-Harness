@@ -12,6 +12,8 @@ FROM deps AS app
 # secret files, which are owned by that user and mode 600, are readable without loosening permissions.
 ARG APP_UID=1000
 ARG APP_GID=1000
+# git runs the push from the app (approval-gated; see docs/DESIGN.md). The token is passed per command, never stored.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY tsconfig.json ./
 COPY src ./src
 COPY public ./public

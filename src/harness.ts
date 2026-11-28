@@ -20,6 +20,8 @@ import { FileCredentialStore, LayeredCredentialStore } from "./credentials.js";
 import { openSecretStore } from "./secret-store.js";
 import { McpManager } from "./mcp.js";
 import { webSearchServer } from "./web-search.js";
+import { GitPushService, GITHUB_TOKEN_SECRET } from "./git-push.js";
+import { gitPushExtension } from "./push-approval.js";
 
 export const context = BACKGROUND_CONTEXT;
 
@@ -61,6 +63,15 @@ export async function openHarness(config: Config) {
 	registry.install(keepGoingExtension(keepGoing));
 	// ask_user: the model asks the person a question; the browser answers (see src/ask.ts).
 	registry.install(askExtension);
+	// git_push: the app pushes main after the person approves (see src/push-approval.ts). The token stays in the app.
+	const gitPush = new GitPushService({
+		dataDir: config.dataDir,
+		runnerUrl: config.runnerUrl,
+		runnerToken,
+		remoteUrl: config.gitRemoteUrl,
+		getToken: () => secretStore?.read(GITHUB_TOKEN_SECRET),
+	});
+	registry.install(gitPushExtension(gitPush));
 	// MCP servers from DATA_DIR/mcp.json. Failures are recorded per server (see mcp.list()), never thrown here.
 	const mcp = new McpManager(registry, join(config.dataDir, "mcp.json"), config.runnerUrl, runnerToken, [webSearchServer(config.dataDir)]);
 	const mcpErrors = await mcp.start();
@@ -81,7 +92,7 @@ export async function openHarness(config: Config) {
 	});
 	await applySettings(root, models, settings);
 	harness.resume(); // continue any run the last process left unfinished
-	return { harness, root, models, settings, reviews, keepGoing, credentials, secretStore, secretKey: secretKey !== undefined, mcp, mcpErrors, runnerUrl: config.runnerUrl, runnerToken };
+	return { harness, root, models, settings, reviews, keepGoing, credentials, secretStore, secretKey: secretKey !== undefined, gitPush, mcp, mcpErrors, runnerUrl: config.runnerUrl, runnerToken };
 }
 
 // Chat models the browser can pick, from the pi-ai catalog.

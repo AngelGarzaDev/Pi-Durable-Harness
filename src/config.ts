@@ -11,6 +11,8 @@ export interface Config {
 	runnerTokenFile: string;
 	tokenFile: string;
 	masterKeyFile: string;
+	// Repository the git_push tool pushes main to. Empty = pushing is off (the tool says so).
+	gitRemoteUrl: string;
 }
 
 export function loadConfig(env = process.env): Config {
@@ -24,6 +26,7 @@ export function loadConfig(env = process.env): Config {
 		runnerTokenFile: env.RUNNER_TOKEN_FILE ?? "/run/secrets/runner_token",
 		tokenFile: env.APP_TOKEN_FILE ?? "/run/secrets/app_token",
 		masterKeyFile: env.MASTER_KEY_FILE ?? "/run/secrets/master_key",
+		gitRemoteUrl: env.GIT_REMOTE_URL ?? "",
 	};
 }
 
