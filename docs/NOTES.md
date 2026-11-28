@@ -339,3 +339,4 @@
 - 2026-11-28 Runner typecheck: the root tsconfig covers only `src`, so the runner is checked with `npx tsc --ignoreConfig --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 --skipLibCheck --esModuleInterop --types node runner/server.ts runner/staging.ts`.
 - 2026-11-28 Pushed origin main 86ebfe8..7ea571c (staged folder upload, commit 7ea571c). Token via temporary askpass, script deleted.
 - 2026-11-28 Removed the client-side pre-check that refused a folder containing any file over 15 MB before uploading (user request). The server limit of 15 MB per file still applies (UPLOAD_MAX_BYTES, runner 16 MiB body cap), so an oversized file now fails mid-folder and the staged folder is discarded. The 2 GB total cap is unchanged. Open question: raise the per-file server limit?
+- 2026-11-28 Pushed origin main 7ea571c..f73e809 (remove folder 15 MB pre-check). Token via temporary askpass, script deleted.
