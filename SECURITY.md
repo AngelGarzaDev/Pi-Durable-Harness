@@ -3,7 +3,7 @@
 ## Scope
 
 pi-durable-web is built for one trusted user on their own machine. The default install serves plain
-HTTP on `127.0.0.1` and uses a shared login token. It is not hardened for multiple users or for
+HTTP on all host interfaces (LAN by default; `APP_BIND=127.0.0.1` restricts it to localhost) and uses a shared login token. It is not hardened for multiple users or for
 exposure to the internet.
 
 ## Design

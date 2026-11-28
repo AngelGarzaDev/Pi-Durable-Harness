@@ -23,7 +23,8 @@ services:
       RUNNER_TOKEN_FILE: /run/secrets/runner_token
     secrets: [anthropic_api_key, app_token, runner_token]
     volumes: ["app-data:/data"]
-    ports: ["127.0.0.1:8787:8787"]
+    # Listens on all host interfaces by default (LAN access). Set APP_BIND=127.0.0.1 to keep it local only.
+    ports: ["${APP_BIND:-0.0.0.0}:8787:8787"]
     networks: [edge, tools]
     depends_on:
       runner: { condition: service_healthy }

@@ -21,7 +21,7 @@ default and is switched on per chat.
 ## Quick start
 
 You need Docker with Compose and an Anthropic API key. This is for a trusted single user on your own
-machine. It serves plain HTTP on `127.0.0.1` only, so do not expose port 8787 to a network.
+machine. It serves plain HTTP on port 8787 on all host interfaces, so other devices on your LAN can open it. Do not expose it to the internet, and put HTTPS in front of it before using it outside a trusted network. Set `APP_BIND=127.0.0.1` to keep it local only.
 
 ```sh
 git clone https://github.com/AngelGarzaDev/Pi-Durable-Harness.git
@@ -113,7 +113,7 @@ Anthropic key is always read from a file, never from an environment variable.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `HOST` / `PORT` | `127.0.0.1` / `8787` | app listen address (the container sets `0.0.0.0`; Compose publishes it on `127.0.0.1` only) |
+| `HOST` / `PORT` | `127.0.0.1` / `8787` | app listen address (the container sets `0.0.0.0`; Compose publishes it on `${APP_BIND:-0.0.0.0}`, set `APP_BIND=127.0.0.1` for local only) |
 | `DATA_DIR` | `./data` | chats, settings, session database |
 | `ANTHROPIC_API_KEY_FILE` | `/run/secrets/anthropic_api_key` | Anthropic key file |
 | `APP_TOKEN_FILE` | `/run/secrets/app_token` | login token file |
