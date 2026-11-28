@@ -340,3 +340,4 @@
 - 2026-11-28 Pushed origin main 86ebfe8..7ea571c (staged folder upload, commit 7ea571c). Token via temporary askpass, script deleted.
 - 2026-11-28 Removed the client-side pre-check that refused a folder containing any file over 15 MB before uploading (user request). The server limit of 15 MB per file still applies (UPLOAD_MAX_BYTES, runner 16 MiB body cap), so an oversized file now fails mid-folder and the staged folder is discarded. The 2 GB total cap is unchanged. Open question: raise the per-file server limit?
 - 2026-11-28 Pushed origin main 7ea571c..f73e809 (remove folder 15 MB pre-check). Token via temporary askpass, script deleted.
+- 2026-11-28 Runner image now installs git (apt, git + ca-certificates, --no-install-recommends) in the runner stage of Dockerfile. Verified in the dev runner: git 2.39.5. Internal-only networks still block outbound access by default; git clone needs compose.internet.yaml or compose.lan.yaml.

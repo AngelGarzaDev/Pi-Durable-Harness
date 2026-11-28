@@ -28,6 +28,9 @@ ARG APP_GID=1000
 COPY tsconfig.json ./
 COPY runner ./runner
 ENV NODE_ENV=production
+# git lets the model clone and commit inside /workspace. Installed as root, before switching to the app user.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /workspace && chown ${APP_UID}:${APP_GID} /workspace
 USER ${APP_UID}:${APP_GID}
 EXPOSE 7000
