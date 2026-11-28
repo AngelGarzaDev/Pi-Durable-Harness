@@ -155,6 +155,28 @@ docker compose up -d --build
 
 Fresh installs do not need this.
 
+### Updating an install
+
+Your chats, folders, settings and keys live in the `app-data` volume, and workspace files in `workspace`. An update
+rebuilds the containers and keeps both volumes, so nothing is lost. Before updating, back up the app data:
+
+```sh
+docker run --rm -v pi-durable-web_app-data:/data:ro alpine tar czf - -C /data . > app-data-$(date +%F).tgz
+```
+
+Then update the code and redeploy:
+
+```sh
+git pull --ff-only origin main        # or copy the new files over your checkout
+docker compose up -d --build          # rebuilds the app and runner images and restarts them
+curl -s http://127.0.0.1:8787/healthz # should print: ok
+```
+
+If the new version needs a change to the Upgrading steps above, follow those first. Check the commit with
+`git log --oneline -1`. To go back, check out the previous commit and run the same `docker compose up -d --build`.
+Your data stays, but a schema change in a newer version may not work on an older one, so take the backup first.
+Secret files (`secrets/`) are not touched by an update.
+
 ## Tests and checks
 
 ```sh

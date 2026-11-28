@@ -273,6 +273,37 @@ document.getElementById("f").onsubmit = (e) => {
 	send("followUp");
 };
 document.getElementById("steer").onclick = () => send("steer");
+
+// File uploads. The server saves the file under a safe name and returns its path in the workspace.
+const MAX_UPLOAD = 15 * 1024 * 1024;
+async function uploadFile(file, query) {
+	if (file.size > MAX_UPLOAD) return { ok: false, error: "File is too large (15 MB limit)." };
+	const r = await fetch("/upload?" + query, { method: "POST", headers: { "x-file-name": encodeURIComponent(file.name) }, body: file });
+	return r.json().catch(() => ({ ok: false, error: "Upload failed." }));
+}
+document.getElementById("attach").onclick = () => document.getElementById("attachfile").click();
+document.getElementById("attachfile").onchange = async (e) => {
+	const file = e.target.files[0];
+	e.target.value = "";
+	if (!file) return;
+	if (openId === null) return showNotice("Open a chat before uploading a file.");
+	showNotice("Uploading " + file.name + "…");
+	const res = await uploadFile(file, "chat=" + openId);
+	if (res.ok) {
+		input.value = (input.value.trim() ? input.value.trimEnd() + " " : "") + res.path;
+		showNotice("Uploaded " + res.name + ". Its path is in your message.");
+	} else showNotice(res.error);
+	input.focus();
+};
+const wsUploadMsg = document.getElementById("wsuploadmsg");
+document.getElementById("wsupload").onchange = async (e) => {
+	const file = e.target.files[0];
+	e.target.value = "";
+	if (!file || !wsFolder) return;
+	wsUploadMsg.textContent = "Uploading " + file.name + "…";
+	const res = await uploadFile(file, "folder=" + encodeURIComponent(wsFolder));
+	wsUploadMsg.textContent = res.ok ? "Saved as " + res.path : res.error;
+};
 const newFolder = document.getElementById("newfolder");
 const newMsg = document.getElementById("newmsg");
 document.getElementById("new").onclick = () => {

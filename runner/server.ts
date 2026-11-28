@@ -1,7 +1,8 @@
 // Runner: executes the agent's file and shell operations. It holds NO credentials and only sees WORKSPACE.
 // Runs in its own container in production; the app reaches it over an internal network only.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, realpathSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { bearerMatches, insideRoot } from "./guard.js";
 import { callTool, listTools, startServer, stopServer, stopAll } from "./mcp.js";
@@ -95,6 +96,37 @@ async function readBody(req: IncomingMessage): Promise<any> {
 	}
 	return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
+// Raw bytes (not JSON) for file uploads, same size limit as the other bodies.
+async function readRaw(req: IncomingMessage): Promise<Buffer> {
+	const chunks: Buffer[] = [];
+	let size = 0;
+	for await (const c of req) {
+		size += (c as Buffer).length;
+		if (size > MAX_BODY) throw new Error("body too large");
+		chunks.push(c as Buffer);
+	}
+	return Buffer.concat(chunks);
+}
+
+// Writes one uploaded file at the virtual path in x-upload-path. Exclusive create: an existing file gives 409, never an overwrite.
+async function handleUpload(req: IncomingMessage, res: ServerResponse) {
+	const path = req.headers["x-upload-path"];
+	if (typeof path !== "string" || !path.startsWith(VIRTUAL_ROOT + "/") || !insideWorkspace(path)) {
+		await readRaw(req).catch(() => undefined);
+		return send(res, 400, { ok: false, error: `path is outside the workspace: ${String(path)}` });
+	}
+	const bytes = await readRaw(req);
+	const host = toHost(path);
+	try {
+		mkdirSync(dirname(host), { recursive: true });
+		writeFileSync(host, bytes, { flag: "wx" });
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "EEXIST") return send(res, 409, { ok: false, error: "exists" });
+		throw error;
+	}
+	return send(res, 200, { ok: true, path });
+}
+
 function send(res: ServerResponse, status: number, body: unknown) {
 	res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
 }
@@ -193,6 +225,7 @@ createServer(async (req, res) => {
 		if (req.method === "GET" && url.pathname === "/healthz") return send(res, 200, { ok: true });
 		if (!bearerMatches(req.headers.authorization, RUNNER_TOKEN)) return send(res, 401, { error: "unauthorized" });
 		if (req.method !== "POST") return send(res, 405, { error: "method not allowed" });
+		if (url.pathname === "/v1/upload") return await handleUpload(req, res);
 		if (url.pathname === "/v1/call") return send(res, 200, await handleCall(await readBody(req)));
 		if (url.pathname === "/v1/reader/open") return send(res, 200, await handleOpenReader(await readBody(req)));
 		if (url.pathname === "/v1/reader") return send(res, 200, await handleReaderOp(await readBody(req)));

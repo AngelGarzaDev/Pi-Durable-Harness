@@ -19,6 +19,7 @@ import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
 import { AGENTS_FILE, AGENTS_HEADER, AGENTS_MAX_CHARS, combineInstructions, readFolderAgents, stripLegacyBlock } from "./agents-md.js";
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_TRIES, candidateName, sanitizeUploadName } from "./uploads.js";
 import { WORKSPACE_ROOT, checkFolderName, folderPath, loadChatFolders, saveChatFolders, type ChatFolders } from "./chat-folder.js";
 import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
 import { FolderRules, loadLegacyRules, saveLegacyRules } from "./folder-rules.js";
@@ -293,6 +294,15 @@ const server = createServer(async (req, res) => {
 		}
 		return;
 	}
+	if (url.pathname === "/upload" && req.method === "POST") {
+		await handleUpload(req, res, url).catch((error) => {
+			if (!res.headersSent) {
+				const tooBig = error instanceof Error && error.message === "body too large";
+				res.writeHead(tooBig ? 413 : 500, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: tooBig ? "File is too large (15 MB limit)." : publicError(error) }));
+			}
+		});
+		return;
+	}
 	if (!PUBLIC_FILES.has(name)) return void res.writeHead(404).end("not found");
 	try {
 		const body = await readFile(join(publicDir, name));
@@ -343,6 +353,74 @@ async function writeAgents(name: string, text: string): Promise<boolean> {
 	} catch {
 		return false;
 	}
+}
+
+// Where an upload goes: ?folder=<name> (a workspace that a chat uses) or ?chat=<id> (that chat's folder; a chat with
+// no folder gets /workspace/uploads). Returns the directory (virtual path) or an error.
+function uploadDir(url: URL): { dir: string } | { status: number; error: string } {
+	const folder = url.searchParams.get("folder");
+	const chat = url.searchParams.get("chat");
+	if (folder !== null) {
+		if (!knownFolders().includes(folder)) return { status: 404, error: `No workspace named ${folder}.` };
+		return { dir: folderPath(folder) };
+	}
+	if (chat !== null) {
+		if (!/^\d+$/.test(chat)) return { status: 400, error: "Unknown chat." };
+		const f = folderOf(chat);
+		return { dir: f ? folderPath(f) : `${WORKSPACE_ROOT}/uploads` };
+	}
+	return { status: 400, error: "Say which workspace or chat the file is for." };
+}
+
+// POST /upload?folder=<name> or ?chat=<id>, raw file bytes as the body, file name in x-file-name (URL-encoded).
+// Saves under a safe name; a name that is taken gets -2, -3, ... The runner does the write.
+async function handleUpload(req: import("node:http").IncomingMessage, res: import("node:http").ServerResponse, url: URL) {
+	const target = uploadDir(url);
+	if ("error" in target) {
+		await readBody(req, UPLOAD_MAX_BYTES).catch(() => undefined);
+		return void res.writeHead(target.status, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: target.error }));
+	}
+	let decoded: string;
+	try {
+		decoded = decodeURIComponent(String(req.headers["x-file-name"] ?? ""));
+	} catch {
+		decoded = "";
+	}
+	const name = sanitizeUploadName(decoded);
+	if (name === undefined) {
+		await readBody(req, UPLOAD_MAX_BYTES).catch(() => undefined);
+		return void res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "File name is missing." }));
+	}
+	const bytes = await readRawBody(req, UPLOAD_MAX_BYTES);
+	for (let n = 1; n <= UPLOAD_MAX_TRIES; n++) {
+		const candidate = candidateName(name, n);
+		const path = `${target.dir}/${candidate}`;
+		let r: Response;
+		try {
+			r = await fetch(`${runnerUrl}/v1/upload`, {
+				method: "POST",
+				headers: { authorization: `Bearer ${runnerToken}`, "x-upload-path": path, "content-type": "application/octet-stream" },
+				body: new Uint8Array(bytes),
+			});
+		} catch {
+			return void res.writeHead(502, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "Could not reach the runner." }));
+		}
+		if (r.status === 409) continue;
+		if (!r.ok) return void res.writeHead(502, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "The runner refused the file." }));
+		return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ok: true, name: candidate, path }));
+	}
+	return void res.writeHead(409, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "Too many files with that name." }));
+}
+
+async function readRawBody(req: import("node:http").IncomingMessage, limit: number): Promise<Buffer> {
+	const chunks: Buffer[] = [];
+	let size = 0;
+	for await (const chunk of req) {
+		size += (chunk as Buffer).length;
+		if (size > limit) throw new Error("body too large");
+		chunks.push(chunk as Buffer);
+	}
+	return Buffer.concat(chunks);
 }
 
 async function makeFolder(name: string): Promise<boolean> {

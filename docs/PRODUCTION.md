@@ -43,6 +43,18 @@ cd deploy/production && docker compose ps
 - SELinux (Enforcing on this host): secrets must carry `container_file_t`. `deploy.sh` does this. Without it the runner fails with `EACCES: permission denied, open '/run/secrets/runner_token'`.
 
 ## Backup
+## Updating production (checklist)
+
+1. Commit and push the change to `main`. `deploy.sh` refuses a dirty tree.
+2. Back up production data, streaming to a host file (see the note below about bind mounts):
+   `docker run --rm -v pi-durable-prod_app-data:/data:ro alpine tar czf - -C /data . > deploy/production/backup/app-data-pre-<change>-$(date +%F-%H%M).tgz`
+3. Run `deploy/production/deploy.sh`. It rebuilds and writes `.deployed-commit`.
+4. Check: `curl -s http://192.168.1.30:8790/healthz` prints `ok`; `docker compose -f deploy/production/compose.yaml ps` shows
+   all containers up; open the UI and send one message (only when the user asks for a model call).
+5. Add a dated line below (commit range, backup file name, checks). Do not put tokens in it.
+6. To roll back: `git checkout <previous-commit>` in a separate worktree, run deploy.sh from it, and restore the backup
+   only if the data itself was damaged.
+
 Pre-deploy backup for d54cb01: deploy/production/backup/app-data-pre-goal8-2026-11-22-1725.tgz (ignored by git).
 Note: `-v "$PWD/...:/backup"` bind mounts fail with Permission denied here (SELinux). Stream to a host file instead:
 `docker run --rm -v pi-durable-prod_app-data:/data:ro alpine tar czf - -C /data . > backup/app-data-DATE.tgz`
