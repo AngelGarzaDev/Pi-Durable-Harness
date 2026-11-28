@@ -136,12 +136,12 @@ Hardening for both containers:
 
 Known limits (be explicit):
 - The token is in `app`'s process memory while it makes requests. Anything that can read that process (a bug in `app`, or a future shell tool added to it) could leak it. Keep `app` free of general-purpose tools.
-- Runner network egress: the agent can reach the internet if the runner has it. The token is not in the runner, so it cannot be sent out, but workspace contents could be. Decide whether `runner` gets internet access (needed for package installs) or only the internal network.
+- Runner network egress: the agent can reach the internet if the runner has it. The token is not in the runner, so it cannot be sent out, but workspace contents could be. DECIDED 2026-11-28 (user m00826): the runner has internet access by default (`egress` network). Mitigation: no credentials in the runner; removing `egress` cuts it off. Open risk: injected tool output could steer exfiltration of workspace files; an allowlist proxy is not built.
 - Anything the agent writes into `/workspace` is visible to any later process that mounts that volume.
 - Rootless Docker or Podman (podman is already installed on this host) would also remove the root-equivalence risk of the docker group. Option to consider.
 
 Open decisions:
-1. Runner internet access: yes (package installs) or no (internal only).
+1. Runner internet access: DECIDED yes, by default (user m00826, 2026-11-28).
 2. Rootless Podman instead of Docker: yes or no.
 
 ## Phase 1 record (in progress)
@@ -150,7 +150,7 @@ Open decisions:
 - Secret file ownership: compose bind-mounts the host file, so it must be readable by the container UID. Plan: `app` runs as UID 1000 (the usual first host user) with the file mode 0400. Note: this UID is non-root but not separate from the host user; the runner container must use a different UID with no secret access.
 - Files: `src/config.ts`, `src/harness.ts` (opens Harness over `data/session.sqlite`, root conversation, `harness.resume()`), `src/server.ts` (HTTP static + `/healthz`, WebSocket `/ws`: server pushes full `ConversationView` on each change; client sends `submit` (whenBusy steer|followUp) and `abort`), `public/` (plain test page; React UI in Phase 2).
 - Not yet done: auth token on WebSocket (planned), tool environment and runner container (Phase 1b / 4), real key, typecheck of runtime behaviour.
-- Open: runner internet access; rootless Podman vs Docker.
+- Open: rootless Podman vs Docker (runner internet access decided 2026-11-28).
 
 ## Feature status (2026-11-22)
 - Done: model and context-limit settings; manual and automatic compaction; steer (`whenBusy: "steer"`); fork from a message ("branch from here"); reset with optional handoff ("New context"); multiple chats (sidebar, `chats.json` titles); max tool rounds per answer (`maxTurns`, default 50, range 1–500).

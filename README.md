@@ -67,14 +67,13 @@ earlier version that used another runner uid, see "Upgrading" below.
 Stop with `docker compose down`. Chats are kept in the `app-data` volume and files the model writes are in
 the `workspace` volume. `docker compose down -v` deletes both volumes.
 
-### Allowing the runner to reach the internet
+### Runner internet access
 
-By default the runner has no internet access (its network is internal). To let the model fetch
-URLs or install packages:
-
-```sh
-docker compose -f compose.yaml -f compose.internet.yaml up -d --build
-```
+The runner has internet access by default (its `egress` network is a normal bridge), so the model can fetch
+URLs and install packages. It has no credentials, and it cannot reach the app's secrets. To cut it off, remove
+`egress` from the runner's `networks:` in `compose.yaml` and redeploy. `compose.internet.yaml` is now a no-op,
+kept so older commands still run. Since 2026-11-28 (user decision, m00826) this default replaces the
+earlier internal-only default; the risk is recorded in `SECURITY.md` and `docs/DESIGN.md`.
 
 ## Running without Docker (development only)
 
@@ -135,7 +134,7 @@ The model has `web_search`, `fetch_content`, `get_search_content` and `source_ch
 from Pi's `pi-web-access` package (pinned in `package.json`), which runs inside the app container. Without any
 configuration it searches with a keyless provider. To change providers or add API keys, put a `web-search.json`
 in `DATA_DIR/web-access/` (for example `searxngBaseUrl`). Keys live only in that file on the data volume and are
-never printed. The runner still has no internet access. The name `web` is reserved in `mcp.json`.
+never printed. The runner has internet access by default (see above). The name `web` is reserved in `mcp.json`.
 
 ### Keep going
 
@@ -203,7 +202,7 @@ you must offer its source to its users.
 
 ### Giving the runner access to the LAN
 
-`compose.lan.yaml` puts the runner on a normal bridge network, so it can reach the LAN and the internet:
+`compose.lan.yaml` adds a `lan` network, so the runner can reach the LAN (it already has internet access by default):
 
 ```sh
 docker compose -f compose.yaml -f compose.lan.yaml up -d --build

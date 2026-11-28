@@ -1,4 +1,5 @@
-# Default: the runner has NO internet access (its network is internal). See compose.internet.yaml to allow it.
+# Default: the runner HAS internet access (network egress) and a shell with no credentials. It cannot reach the app's
+# secrets. To cut it off, remove "egress" from the runner's networks below. See docs/DESIGN.md and SECURITY.md.
 name: pi-durable-web
 
 services:
@@ -53,7 +54,7 @@ services:
       RUNNER_TOKEN_FILE: /run/secrets/runner_token
     secrets: [runner_token]
     volumes: ["workspace:/workspace"]
-    networks: [tools]
+    networks: [tools, egress]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 30s
@@ -63,6 +64,7 @@ services:
 networks:
   edge: {}                 # normal bridge: app reaches api.anthropic.com
   tools: { internal: true } # no route to the outside world: app <-> runner only
+  egress: {}                # normal bridge: the runner reaches the internet (default since 2026-11-28, user m00826)
 
 secrets:
   anthropic_api_key:
