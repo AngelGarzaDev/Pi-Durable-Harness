@@ -1,6 +1,6 @@
 # Plan: staged folder upload
 
-Status: PLAN ONLY (user m00500 "Copy the folder to a tmp dir then move it to the destination when the upload is done. Let's plan that out."). Nothing implemented yet.
+Status: IMPLEMENTED (user m00500 plan request; answers m00509: hidden dot-dir staging, rename on clash, folders only, 24 h sweep). Staging is `<target>/.staging/<id>/<top>`, per folder, not at the workspace root. Commit is in the runner (`/v1/stage/commit`), discard in `/v1/stage/discard`, sweep in `runner/staging.ts` (`sweepStaging`, hourly). Tests: tests/staging.test.ts and tests/upload.test.ts.
 
 ## Goal
 A folder upload either lands complete in its destination or not at all. Today files are written straight into the destination, so a cancelled or failed upload leaves a partial folder that the model can see.

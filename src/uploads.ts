@@ -37,3 +37,11 @@ export function sanitizeRelativePath(raw: string): string[] | undefined {
 	}
 	return out;
 }
+
+// Staged folder uploads: the browser gets an id, sends every file of the folder under <dir>/.staging/<id>/, and the
+// runner moves the whole folder into place on commit (or deletes it on cancel). See runner/staging.ts.
+export const STAGE_ID_RE = /^[a-f0-9]{32}$/;
+export function newStageId(bytes: (n: number) => Uint8Array): string {
+	return Array.from(bytes(16), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+export const STAGING_DIR = ".staging";

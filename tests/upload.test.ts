@@ -7,7 +7,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { candidateName, sanitizeRelativePath, sanitizeUploadName, UPLOAD_MAX_BYTES } from "../src/uploads.ts";
+import { candidateName, sanitizeRelativePath, sanitizeUploadName, UPLOAD_MAX_BYTES, newStageId, STAGE_ID_RE } from "../src/uploads.ts";
 
 const PORT = 20100 + Math.floor(Math.random() * 400);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -37,12 +37,37 @@ test("candidateName adds -2, -3 before the extension", () => {
 	assert.equal(candidateName(".bashrc", 2), ".bashrc-2");
 });
 
+// Fixture for the runner's staging routes: keys are the virtual paths, so a commit is a key rename.
+function stageRoute(url: string, body: { staging?: string; dir?: string; name?: string; path?: string }, res: import("node:http").ServerResponse) {
+	const send = (status: number, data: unknown) => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ status, ...(data as object) }));
+	if (url === "/v1/stage/discard") {
+		for (const key of [...stored.keys()]) if (key.startsWith(body.path + "/")) stored.delete(key);
+		return send(200, { ok: true });
+	}
+	const staging = body.staging ?? "";
+	const keys = [...stored.keys()].filter((k) => k.startsWith(staging + "/"));
+	if (keys.length === 0) return send(404, { ok: false, error: "The staged folder is missing." });
+	let name = body.name ?? "";
+	for (let n = 1; n <= 50; n++) {
+		const candidate = n === 1 ? name : `${name}-${n}`;
+		const to = `${body.dir}/${candidate}`;
+		if ([...stored.keys()].some((k) => k === to || k.startsWith(to + "/"))) continue;
+		for (const key of keys) {
+			stored.set(to + key.slice(staging.length), stored.get(key)!);
+			stored.delete(key);
+		}
+		return send(200, { ok: true, name: candidate, path: to });
+	}
+	return send(409, { ok: false, error: "Too many folders with that name." });
+}
+
 before(async () => {
 	runner = createServer((req, res) => {
 		const chunks: Buffer[] = [];
 		req.on("data", (c) => chunks.push(c));
 		req.on("end", () => {
 			seenAuth.push(String(req.headers.authorization));
+			if (req.url === "/v1/stage/commit" || req.url === "/v1/stage/discard") return void stageRoute(req.url, JSON.parse(Buffer.concat(chunks).toString()), res);
 			const path = String(req.headers["x-upload-path"]);
 			if (stored.has(path)) return void res.writeHead(409).end("{}");
 			stored.set(path, Buffer.concat(chunks));
@@ -173,4 +198,79 @@ test("a folder upload keeps its structure under the target folder", async () => 
 test("a folder upload with an unsafe relative path is refused", async () => {
 	assert.equal((await uploadRel("folder=proj", "../escape.txt", "x")).status, 400);
 	assert.equal(stored.has("/workspace/escape.txt"), false);
+});
+
+// Staged folder upload: files go to <folder>/.staging/<id>/ and only reach the folder on commit.
+function stagedUpload(query: string, id: string, rel: string, body: string) {
+	const headers: Record<string, string> = { "content-type": "application/octet-stream", cookie, "x-relative-path": encodeURIComponent(rel), "x-staging-id": id };
+	return fetch(`${BASE}/upload?${query}`, { method: "POST", headers, body });
+}
+async function startStage(query = "folder=proj"): Promise<string> {
+	const r = (await (await fetch(`${BASE}/upload/start?${query}`, { method: "POST", headers: { cookie } })).json()) as { ok: boolean; id: string };
+	assert.equal(r.ok, true);
+	return r.id;
+}
+
+test("upload/start returns a 32-hex id", async () => {
+	const id = await startStage();
+	assert.match(id, STAGE_ID_RE);
+	assert.equal(newStageId((n) => new Uint8Array(n).fill(0xab)), "ab".repeat(16));
+});
+
+test("staged files stay out of the folder until commit", async () => {
+	const id = await startStage();
+	const r = await stagedUpload("folder=proj", id, "stage1/a.txt", "staged");
+	assert.equal(r.status, 200);
+	assert.equal(((await r.json()) as { path: string }).path, `/workspace/proj/.staging/${id}/stage1/a.txt`);
+	assert.equal(stored.get(`/workspace/proj/.staging/${id}/stage1/a.txt`)?.toString(), "staged");
+	assert.equal(stored.has("/workspace/proj/stage1/a.txt"), false);
+});
+
+test("commit moves the whole staged folder into place", async () => {
+	const id = await startStage();
+	await stagedUpload("folder=proj", id, "moved/x.txt", "one");
+	await stagedUpload("folder=proj", id, "moved/sub/y.txt", "two");
+	const r = await fetch(`${BASE}/upload/commit?folder=proj&id=${id}&top=moved`, { method: "POST", headers: { cookie } });
+	assert.deepEqual(await r.json(), { ok: true, name: "moved", path: "/workspace/proj/moved" });
+	assert.equal(stored.get("/workspace/proj/moved/x.txt")?.toString(), "one");
+	assert.equal(stored.get("/workspace/proj/moved/sub/y.txt")?.toString(), "two");
+	assert.equal([...stored.keys()].some((k) => k.includes(`/.staging/${id}`)), false);
+});
+
+test("a commit onto a taken folder name gets -2", async () => {
+	const id = await startStage();
+	await stagedUpload("folder=proj", id, "clash/z.txt", "again");
+	const r = (await (await fetch(`${BASE}/upload/commit?folder=proj&id=${id}&top=clash`, { method: "POST", headers: { cookie } })).json()) as { name: string; path: string };
+	assert.equal(r.name, "clash");
+	const again = (await (await fetch(`${BASE}/upload/commit?folder=proj&id=${id}&top=clash`, { method: "POST", headers: { cookie } })).json()) as { ok: boolean };
+	assert.equal(again.ok, false);
+	const id2 = await startStage();
+	await stagedUpload("folder=proj", id2, "clash/z.txt", "third");
+	const second = (await (await fetch(`${BASE}/upload/commit?folder=proj&id=${id2}&top=clash`, { method: "POST", headers: { cookie } })).json()) as { name: string; path: string };
+	assert.equal(second.name, "clash-2");
+	assert.equal(second.path, "/workspace/proj/clash-2");
+	assert.equal(stored.get("/workspace/proj/clash-2/z.txt")?.toString(), "third");
+	assert.equal(stored.get("/workspace/proj/clash/z.txt")?.toString(), "again");
+});
+
+test("cancel removes everything staged for that id", async () => {
+	const id = await startStage();
+	await stagedUpload("folder=proj", id, "gone/a.txt", "x");
+	const r = await fetch(`${BASE}/upload/cancel?folder=proj&id=${id}`, { method: "POST", headers: { cookie } });
+	assert.equal(r.status, 200);
+	assert.equal([...stored.keys()].some((k) => k.includes(`/.staging/${id}`)), false);
+	assert.equal(stored.has("/workspace/proj/gone/a.txt"), false);
+});
+
+test("staging refuses bad ids, missing folders and unsafe names", async () => {
+	assert.equal((await stagedUpload("folder=proj", "not-hex", "a/b.txt", "x")).status, 400);
+	assert.equal((await fetch(`${BASE}/upload/cancel?folder=proj&id=zz`, { method: "POST", headers: { cookie } })).status, 400);
+	assert.equal((await fetch(`${BASE}/upload/commit?folder=proj&id=${"0".repeat(32)}&top=nothing`, { method: "POST", headers: { cookie } })).status, 404);
+	const id = await startStage();
+	assert.equal((await fetch(`${BASE}/upload/commit?folder=proj&id=${id}&top=..`, { method: "POST", headers: { cookie } })).status, 400);
+	const noFolder = await fetch(`${BASE}/upload?chat=1`, { method: "POST", headers: { cookie, "x-file-name": "f.txt", "x-staging-id": id }, body: "x" });
+	assert.equal(noFolder.status, 400);
+	assert.equal((await fetch(`${BASE}/upload/start?folder=nope`, { method: "POST", headers: { cookie } })).status, 404);
+	// POST without a cookie is a bare 401. (A GET would be redirected to /login and fetch would follow it to a 200.)
+	assert.equal((await fetch(`${BASE}/upload/start?folder=proj`, { method: "POST" })).status, 401);
 });

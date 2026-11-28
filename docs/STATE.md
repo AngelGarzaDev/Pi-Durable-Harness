@@ -1,7 +1,7 @@
 # STATE
 
 ## Current task
-Folder upload (user m00418 "Let's add the ability to upload folders not just files"): code, tests, UI done. Docs and commit in progress.
+Staged folder upload (user m00500/m00509): all-or-nothing folder upload via `<target>/.staging/<id>` and rename on commit. Code, tests (196 pass) and docs done. Commit and push next, then dev redeploy and live check.
 
 ## Done this session
 - Uploads (files) from earlier: src/uploads.ts, POST /upload (src/server.ts), POST /v1/upload (runner/server.ts). Prod has files-only uploads at 23c1db1.
@@ -10,15 +10,15 @@ Folder upload (user m00418 "Let's add the ability to upload folders not just fil
 - tests/upload.test.ts: sanitizeRelativePath unit test, nested folder upload, unsafe path refused. Full suite 183 pass; typecheck ok.
 
 ## Next step
-Update README/NOTES, commit, push (askpass recipe; delete script), dev redeploy and check healthz. Browser check of the folder picker not yet done. Prod NOT deployed (needs user go-ahead).
+Commit, push (askpass recipe; delete script), dev redeploy (`docker compose up -d --build`), healthz, live check that no `.staging` is left after commit and cancel. Browser check of the folder picker not yet done. Prod NOT deployed (needs user go-ahead).
 
 ## How to run and test
-- Tests: `npm run typecheck && npm test` (183 passing).
+- Tests: `npm run typecheck && npm test` (196 passing).
 - Dev: `docker compose up -d --build` in durable-web/, check http://127.0.0.1:8787/healthz.
 - Prod: `deploy/production/deploy.sh` (only when user asks). Backup first.
 
 ## Needs you
-- Prod deploy of folder upload, when you say so.
+- Prod deploy of folder upload (staged), when you say so.
 - Keep-going design answers (11.1, from earlier).
 - Goal 5.2 second user check (parked).
 - Dev mcp.json "echo" entry and /workspace/mcp-live: delete if you want.
@@ -26,4 +26,4 @@ Update README/NOTES, commit, push (askpass recipe; delete script), dev redeploy 
 - Known: a folder name starting with a dot loses the dot (".github" becomes "github") because the name sanitizer drops leading dots.
 
 ## Planned next (not started)
-- Staged folder upload: see docs/PLAN-STAGED-FOLDER-UPLOAD.md. Answer its 4 questions first.
+- Optional: resume a staged folder with the same id (skip same-size files). Not asked for.

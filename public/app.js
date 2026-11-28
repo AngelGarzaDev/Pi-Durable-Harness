@@ -287,49 +287,75 @@ function setUploadBusy(busy) {
 	for (const b of document.querySelectorAll(".uploadcancel")) b.hidden = !busy;
 }
 // rel: the file's path inside a picked folder (sent as x-relative-path so the server creates the folders).
-async function uploadFile(file, query, rel) {
+// stageId: when set, the file goes into the folder's staging area instead of its final place (see uploadFolder).
+async function uploadFile(file, query, rel, stageId) {
 	if (file.size > MAX_UPLOAD) return { ok: false, error: file.name + " is too large (15 MB limit)." };
 	const headers = { "x-file-name": encodeURIComponent(file.name) };
 	if (rel !== undefined) headers["x-relative-path"] = encodeURIComponent(rel);
+	if (stageId !== undefined) headers["x-staging-id"] = stageId;
 	const r = await fetch("/upload?" + query, { method: "POST", headers, body: file });
 	return r.json().catch(() => ({ ok: false, error: "Upload failed." }));
 }
-// Uploads each file of a picked folder one after another. Returns the saved count, the failures, the folder's top name
-// and where it was saved in the workspace (folderPath, from the first saved file).
+async function postStage(route, query) {
+	const r = await fetch("/upload/" + route + "?" + query, { method: "POST" });
+	return r.json().catch(() => ({ ok: false, error: "Upload failed." }));
+}
+// Uploads a picked folder all or nothing. Files go into a staging folder in the workspace (.staging/<id>/).
+// The folder is moved into place only after every file arrived (commit, which may add -2 to the name on a clash).
+// If a file fails or the user cancels, the staging folder is removed, so nothing partial is left in the workspace.
+// Returns saved, failed, top, folderPath (the final folder, when committed), cancelled, skipped, and error (if refused).
 async function uploadFolder(files, query, onProgress) {
 	const list = Array.from(files);
 	const bytes = list.reduce((sum, f) => sum + f.size, 0);
 	if (bytes > MAX_FOLDER_BYTES) return { saved: 0, failed: [], error: "The folder is " + (bytes / 1024 ** 3).toFixed(2) + " GB, over the 2 GB limit. Upload part of it." };
+	const big = list.find((f) => f.size > MAX_UPLOAD);
+	if (big) return { saved: 0, failed: [], error: "Nothing was uploaded: " + (big.webkitRelativePath || big.name) + " is over the 15 MB file limit." };
 	const top = list.length ? list[0].webkitRelativePath.split("/")[0] : "";
-	let saved = 0;
-	let folderPath = "";
 	const failed = [];
+	if (!list.length) return { saved: 0, failed, top, folderPath: "", cancelled: false, skipped: 0 };
 	uploadCancelled = false;
 	setUploadBusy(true);
 	let i = 0;
+	let folderPath = "";
+	let error = "";
 	try {
+		const started = await postStage("start", query);
+		if (!started.ok) return { saved: 0, failed, top, folderPath, cancelled: false, skipped: list.length, error: started.error || "Upload failed." };
+		const id = started.id;
 		for (; i < list.length; i++) {
 			if (uploadCancelled) break;
 			onProgress(i + 1, list.length);
 			const f = list[i];
-			const res = await uploadFile(f, query, f.webkitRelativePath || f.name);
-			if (res.ok) {
-				saved++;
-				// The saved path is .../<top>/...; the folder is everything up to and including <top>.
-				const at = res.path.indexOf("/" + top + "/");
-				if (folderPath === "" && at >= 0) folderPath = res.path.slice(0, at + top.length + 1);
-			} else failed.push(f.webkitRelativePath || f.name);
+			const res = await uploadFile(f, query, f.webkitRelativePath || f.name, id);
+			if (!res.ok) {
+				failed.push(f.webkitRelativePath || f.name);
+				error = res.error || "Upload failed.";
+				break;
+			}
+		}
+		if (i < list.length || failed.length) {
+			await postStage("cancel", query + "&id=" + id);
+		} else {
+			onProgress(list.length, list.length);
+			const done = await postStage("commit", query + "&id=" + id + "&top=" + encodeURIComponent(top));
+			if (done.ok) folderPath = done.path;
+			else {
+				error = done.error || "Could not finish the folder upload.";
+				await postStage("cancel", query + "&id=" + id);
+			}
 		}
 	} finally {
 		setUploadBusy(false);
 	}
-	const cancelled = i < list.length;
-	return { saved, failed, top, folderPath, cancelled, skipped: list.length - i };
+	const cancelled = uploadCancelled && i < list.length;
+	const saved = folderPath ? list.length : 0;
+	return { saved, failed, top, folderPath, cancelled, skipped: folderPath ? 0 : list.length, error: folderPath ? "" : error };
 }
 function folderSummary(res) {
-	const more = res.failed.length ? " " + res.failed.length + " could not be saved: " + res.failed.slice(0, 5).join(", ") + (res.failed.length > 5 ? " and more" : "") + "." : "";
-	const stop = res.cancelled ? "Upload cancelled; " + res.skipped + " file(s) not sent. " : "";
-	return stop + "Saved " + res.saved + " file(s) from " + res.top + "." + more;
+	if (res.error) return res.error;
+	const more = res.failed.length ? " Failed: " + res.failed.slice(0, 5).join(", ") + (res.failed.length > 5 ? " and more" : "") + "." : "";
+	if (res.cancelled) return "Upload cancelled; nothing was saved from " + res.top + ".";
+	return "Saved " + res.saved + " file(s) from " + res.top + " as " + res.folderPath + "." + more;
 }
 document.getElementById("attach").onclick = () => document.getElementById("attachfile").click();
 document.getElementById("attachdir").onclick = () => document.getElementById("attachdirpick").click();

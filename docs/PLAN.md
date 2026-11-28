@@ -95,3 +95,4 @@ Stop rules to implement: the model says DONE (marker agreed in the prompt), max 
 - [ ] 12.6 Prod only when user asks (deploy/production/deploy.sh).
 
 - [ ] Staged folder upload (user m00500): files go to a hidden staging dir in /workspace; commit by rename on success; discard on cancel; sweep stale. Plan: docs/PLAN-STAGED-FOLDER-UPLOAD.md. Waiting for answers to its 4 questions before step 1.
+- [x] 4.6 Staged folder upload: folder files go to `<target>/.staging/<id>`, renamed into place on commit (clash gives -2), cancel or failure deletes, runner sweeps after 24 h. Tests: tests/staging.test.ts, tests/upload.test.ts.

@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { bearerMatches, insideRoot } from "./guard.js";
+import { commitStaged, discardStaged, STAGE_MAX_AGE_MS, sweepStaging, type StageResult } from "./staging.js";
 import { callTool, listTools, startServer, stopServer, stopAll } from "./mcp.js";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import { ExecutionError, FileError, type BinaryReader, type Result } from "@earendil-works/pi-durable/env";
@@ -127,6 +128,22 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse) {
 	return send(res, 200, { ok: true, path });
 }
 
+// Staged folder uploads (see runner/staging.ts). Paths are virtual (/workspace/...) like the other routes.
+function stageReply(result: StageResult) {
+	return result.ok ? { ok: true, name: result.name, path: result.path.replace(ROOT, VIRTUAL_ROOT) } : { ok: false, status: result.status, error: result.error };
+}
+function handleStageCommit(body: { staging?: unknown; dir?: unknown; name?: unknown }): StageResult {
+	const staging = typeof body.staging === "string" ? body.staging : "";
+	const dir = typeof body.dir === "string" ? body.dir : "";
+	if (!staging.startsWith(VIRTUAL_ROOT + "/") || !insideWorkspace(staging) || !insideWorkspace(dir)) return { ok: false, status: 400, error: "path is outside the workspace" };
+	return commitStaged(ROOT, toHost(staging), toHost(dir), typeof body.name === "string" ? body.name : "");
+}
+function handleStageDiscard(body: { path?: unknown }): StageResult {
+	const path = typeof body.path === "string" ? body.path : "";
+	if (!path.startsWith(VIRTUAL_ROOT + "/") || !insideWorkspace(path)) return { ok: false, status: 400, error: "path is outside the workspace" };
+	return discardStaged(ROOT, toHost(path));
+}
+
 function send(res: ServerResponse, status: number, body: unknown) {
 	res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
 }
@@ -226,6 +243,8 @@ createServer(async (req, res) => {
 		if (!bearerMatches(req.headers.authorization, RUNNER_TOKEN)) return send(res, 401, { error: "unauthorized" });
 		if (req.method !== "POST") return send(res, 405, { error: "method not allowed" });
 		if (url.pathname === "/v1/upload") return await handleUpload(req, res);
+		if (url.pathname === "/v1/stage/commit") return send(res, 200, stageReply(handleStageCommit(await readBody(req))));
+		if (url.pathname === "/v1/stage/discard") return send(res, 200, stageReply(handleStageDiscard(await readBody(req))));
 		if (url.pathname === "/v1/call") return send(res, 200, await handleCall(await readBody(req)));
 		if (url.pathname === "/v1/reader/open") return send(res, 200, await handleOpenReader(await readBody(req)));
 		if (url.pathname === "/v1/reader") return send(res, 200, await handleReaderOp(await readBody(req)));
@@ -244,6 +263,10 @@ createServer(async (req, res) => {
 		else res.end();
 	}
 }).listen(PORT, HOST, () => console.log(`runner listening on ${HOST}:${PORT}, workspace ${WORKSPACE}`));
+
+// Remove abandoned staging folders (a tab closed mid-upload) at start and then hourly.
+sweepStaging(ROOT);
+setInterval(() => sweepStaging(ROOT, Date.now(), STAGE_MAX_AGE_MS), 60 * 60 * 1000).unref();
 
 // Stop MCP servers (child processes) when the runner is asked to stop.
 for (const sig of ["SIGTERM", "SIGINT"] as const) process.on(sig, () => void stopAll().finally(() => process.exit(0)));

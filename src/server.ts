@@ -19,7 +19,8 @@ import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
 import { AGENTS_FILE, AGENTS_HEADER, AGENTS_MAX_CHARS, combineInstructions, readFolderAgents, stripLegacyBlock } from "./agents-md.js";
-import { UPLOAD_MAX_BYTES, UPLOAD_MAX_TRIES, candidateName, sanitizeRelativePath, sanitizeUploadName } from "./uploads.js";
+import { STAGE_ID_RE, STAGING_DIR, UPLOAD_MAX_BYTES, UPLOAD_MAX_TRIES, candidateName, newStageId, sanitizeRelativePath, sanitizeUploadName } from "./uploads.js";
+import { randomBytes } from "node:crypto";
 import { WORKSPACE_ROOT, checkFolderName, folderPath, loadChatFolders, saveChatFolders, type ChatFolders } from "./chat-folder.js";
 import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
 import { FolderRules, loadLegacyRules, saveLegacyRules } from "./folder-rules.js";
@@ -294,6 +295,12 @@ const server = createServer(async (req, res) => {
 		}
 		return;
 	}
+	if (url.pathname.startsWith("/upload/") && req.method === "POST") {
+		await handleStage(req, res, url).catch((error) => {
+			if (!res.headersSent) res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: publicError(error) }));
+		});
+		return;
+	}
 	if (url.pathname === "/upload" && req.method === "POST") {
 		await handleUpload(req, res, url).catch((error) => {
 			if (!res.headersSent) {
@@ -407,10 +414,22 @@ async function handleUpload(req: import("node:http").IncomingMessage, res: impor
 	}
 	const name = parts[parts.length - 1]!;
 	const folders = parts.slice(0, -1).map((part) => `/${part}`).join("");
+	// A staged upload goes under the staging folder, one attempt only (a name is never renamed inside staging).
+	const stageHeader = req.headers["x-staging-id"];
+	let base = target.dir;
+	let tries = UPLOAD_MAX_TRIES;
+	if (stageHeader !== undefined) {
+		if (typeof stageHeader !== "string" || !STAGE_ID_RE.test(stageHeader) || !relative) {
+			await readRawBody(req, UPLOAD_MAX_BYTES).catch(() => undefined);
+			return void res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "Staged uploads need a folder." }));
+		}
+		base = `${target.dir}/${STAGING_DIR}/${stageHeader}`;
+		tries = 1;
+	}
 	const bytes = await readRawBody(req, UPLOAD_MAX_BYTES);
-	for (let n = 1; n <= UPLOAD_MAX_TRIES; n++) {
+	for (let n = 1; n <= tries; n++) {
 		const candidate = candidateName(name, n);
-		const path = `${target.dir}${folders}/${candidate}`;
+		const path = `${base}${folders}/${candidate}`;
 		let r: Response;
 		try {
 			r = await fetch(`${runnerUrl}/v1/upload`, {
@@ -425,7 +444,46 @@ async function handleUpload(req: import("node:http").IncomingMessage, res: impor
 		if (!r.ok) return void res.writeHead(502, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "The runner refused the file." }));
 		return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ok: true, name: candidate, path }));
 	}
-	return void res.writeHead(409, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "Too many files with that name." }));
+	return void res.writeHead(409, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: tries === 1 ? "A file with that path is already in this upload." : "Too many files with that name." }));
+}
+
+// Folder staging: /upload/start (new id), /upload/commit (move the folder into place), /upload/cancel (delete it).
+async function handleStage(req: import("node:http").IncomingMessage, res: import("node:http").ServerResponse, url: URL) {
+	const send = (status: number, body: unknown) => res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+	await readBody(req, MAX_LOGIN_BODY).catch(() => undefined);
+	const target = uploadDir(url);
+	if ("error" in target) return send(target.status, { ok: false, error: target.error });
+	const id = url.pathname === "/upload/start" ? newStageId((n) => randomBytes(n)) : url.searchParams.get("id") ?? "";
+	if (url.pathname === "/upload/start") return send(200, { ok: true, id });
+	if (!STAGE_ID_RE.test(id)) return send(400, { ok: false, error: "Unknown upload." });
+	if (url.pathname === "/upload/cancel") {
+		const r = await runnerStage("/v1/stage/discard", { path: `${target.dir}/${STAGING_DIR}/${id}` });
+		return send(r.ok ? 200 : 502, r.ok ? { ok: true } : { ok: false, error: "Could not remove the upload." });
+	}
+	if (url.pathname === "/upload/commit") {
+		// The folder name is sanitized the same way as its files' paths, so both land under one name.
+		const top = sanitizeUploadName(url.searchParams.get("top") ?? "");
+		if (top === undefined) return send(400, { ok: false, error: "Unknown folder name." });
+		const r = await runnerStage("/v1/stage/commit", { staging: `${target.dir}/${STAGING_DIR}/${id}/${top}`, dir: target.dir, name: top });
+		if (!r.ok) return send(r.status ?? 502, { ok: false, error: r.error ?? "Could not save the folder." });
+		return send(200, { ok: true, name: r.name, path: r.path });
+	}
+	return send(404, { ok: false, error: "not found" });
+}
+
+// Calls a staging route on the runner. Returns the runner's JSON, or a 502-style failure when it cannot be reached.
+async function runnerStage(route: string, body: unknown): Promise<{ ok: boolean; status?: number; error?: string; name?: string; path?: string }> {
+	try {
+		const r = await fetch(`${runnerUrl}${route}`, {
+			method: "POST",
+			headers: { authorization: `Bearer ${runnerToken}`, "content-type": "application/json" },
+			body: JSON.stringify(body),
+		});
+		const data = (await r.json().catch(() => ({ ok: false }))) as { ok?: boolean; status?: number; error?: string; name?: string; path?: string };
+		return { ok: r.ok && data.ok === true, status: data.status, error: data.error, name: data.name, path: data.path };
+	} catch {
+		return { ok: false, status: 502, error: "Could not reach the runner." };
+	}
 }
 
 async function readRawBody(req: import("node:http").IncomingMessage, limit: number): Promise<Buffer> {
