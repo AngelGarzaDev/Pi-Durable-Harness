@@ -11,7 +11,7 @@ A folder upload either lands complete in its destination or not at all. Today fi
 
 ## Design
 1. **Start.** The browser asks the app for an upload id (`POST /upload/start?folder=…` or `chat=…`). The app returns `id`. Staging path = `<target>/.staging-<id>`.
-2. **Files.** Each file goes to the existing `POST /upload` with `x-relative-path` as today, plus a new `x-staging-id` header. The app puts the file under the staging dir instead of the destination. Same rules: `wx`, safe names, 15 MB per file, path containment.
+2. **Files.** Each file goes to the existing `POST /upload` with `x-relative-path` as today, plus a new `x-staging-id` header. The app puts the file under the staging dir instead of the destination. Same rules: `wx`, safe names, path containment (no per-file size limit).
 3. **Commit.** After the last file, the browser calls `POST /upload/commit` with the id. The app asks the runner (new route, bearer token) to `rename(staging/<top>, target/<top>)`.
    - If `target/<top>` exists, the commit picks `<top>-2`, `<top>-3`, … (same rule as file clashes, applied to the folder name). Never merge.
    - Runner rejects paths outside `/workspace`.

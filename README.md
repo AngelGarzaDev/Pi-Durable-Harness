@@ -88,7 +88,7 @@ Each chat works in a folder (workspace). The model reads and writes files there.
 
 - **Attach** uploads a file into the chat's folder. The saved path is added to your message.
 - **Folder** uploads a whole folder and keeps its structure (up to 8 levels deep). The uploaded folder's
-  total size may be up to 2 GB. Each file may be up to 15 MB.
+  total size may be up to 2 GB. There is no per-file size limit; the disk is the limit.
 - A folder upload is all or nothing. Files are first written to a hidden `.staging/<id>` folder and the
   whole folder is moved into place only when every file has arrived. A cancelled or failed upload is removed,
   so the model never sees a partial folder. Staging folders older than 24 hours are removed by the runner.

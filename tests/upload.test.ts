@@ -1,5 +1,5 @@
 // File uploads: the real app (child process) with a fixture runner. Checks auth, target folder, safe names, the
-// -2/-3 suffix on clashes, binary bytes arriving intact, and the 15 MB limit.
+// -2/-3 suffix on clashes (the runner picks the name), binary bytes arriving intact, and no per-file size limit.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -7,7 +7,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { candidateName, sanitizeRelativePath, sanitizeUploadName, UPLOAD_MAX_BYTES, newStageId, STAGE_ID_RE } from "../src/uploads.ts";
+import { candidateName, sanitizeRelativePath, sanitizeUploadName, newStageId, STAGE_ID_RE } from "../src/uploads.ts";
 
 const PORT = 20100 + Math.floor(Math.random() * 400);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -68,10 +68,19 @@ before(async () => {
 		req.on("end", () => {
 			seenAuth.push(String(req.headers.authorization));
 			if (req.url === "/v1/stage/commit" || req.url === "/v1/stage/discard") return void stageRoute(req.url, JSON.parse(Buffer.concat(chunks).toString()), res);
-			const path = String(req.headers["x-upload-path"]);
-			if (stored.has(path)) return void res.writeHead(409).end("{}");
-			stored.set(path, Buffer.concat(chunks));
-			res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ok: true, path }));
+			// Mirrors runner/server.ts handleUpload: try the names in order, never overwrite, return the name used.
+			const wanted = String(req.headers["x-upload-path"]);
+			const tries = Number(req.headers["x-upload-tries"] ?? 1);
+			const slash = wanted.lastIndexOf("/");
+			const dir = wanted.slice(0, slash + 1);
+			const base = wanted.slice(slash + 1);
+			for (let n = 1; n <= tries; n++) {
+				const name = candidateName(base, n);
+				if (stored.has(dir + name)) continue;
+				stored.set(dir + name, Buffer.concat(chunks));
+				return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ ok: true, name, path: dir + name }));
+			}
+			res.writeHead(409).end("{}");
 		});
 	});
 	await new Promise<void>((r) => runner.listen(0, "127.0.0.1", () => r()));
@@ -163,11 +172,11 @@ test("path tricks in the file name stay inside the target folder", async () => {
 	assert.equal(r.path, "/workspace/uploads/passwd");
 });
 
-test("a file over 15 MB is refused with 413", async () => {
-	const big = Buffer.alloc(UPLOAD_MAX_BYTES + 1, 97);
+test("a file over 15 MB is accepted: there is no per-file size limit", async () => {
+	const big = Buffer.alloc(16 * 1024 * 1024 + 1, 97);
 	const r = await upload("folder=proj", "big.bin", big);
-	assert.equal(r.status, 413);
-	assert.equal(stored.has("/workspace/proj/big.bin"), false);
+	assert.equal(r.status, 200);
+	assert.equal(stored.get("/workspace/proj/big.bin")?.length, big.length);
 });
 
 test("sanitizeRelativePath keeps folders and the file, and refuses unsafe paths", () => {

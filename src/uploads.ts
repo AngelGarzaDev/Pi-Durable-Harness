@@ -1,6 +1,5 @@
 // File uploads into a chat's workspace folder. The browser posts raw bytes; the app picks a safe name and the
 // runner writes the file (exclusive create, so it never overwrites). See docs/NOTES.md for the design.
-export const UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
 export const UPLOAD_MAX_NAME = 100;
 export const UPLOAD_MAX_TRIES = 50;
 

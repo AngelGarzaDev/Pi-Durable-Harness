@@ -22,7 +22,7 @@ re-auth. Then build S3 in small commits with tests.
 ## Open items for the user (not blocking)
 a. Should changing the Anthropic key require app-token re-auth (DESIGN says yes; UI does not)?
 b. Prod deploy of S2, staged upload, folder pre-check removal, git, secret store, runner egress: needs go-ahead and an app-data backup.
-c. Raise the 15 MB per-file upload limit?
+c. (Done in this change) per-file upload limit removed.
 d. Browser check of the Secrets panel and folder picker on dev not done.
 e. docs/NOTES.md still has old breaking-change wording (append-only log; decide).
 f. No automated test for steer, although docs/PLAN.md item 2.1 is ticked.

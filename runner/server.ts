@@ -1,9 +1,10 @@
 // Runner: executes the agent's file and shell operations. It holds NO credentials and only sees WORKSPACE.
 // Runs in its own container in production; the app reaches it over an internal network only.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createWriteStream, linkSync, mkdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { pipeline } from "node:stream/promises";
+import { randomBytes, randomUUID } from "node:crypto";
 import { bearerMatches, insideRoot } from "./guard.js";
 import { commitStaged, discardStaged, STAGE_MAX_AGE_MS, sweepStaging, type StageResult } from "./staging.js";
 import { callTool, listTools, startServer, stopServer, stopAll } from "./mcp.js";
@@ -109,23 +110,46 @@ async function readRaw(req: IncomingMessage): Promise<Buffer> {
 	return Buffer.concat(chunks);
 }
 
-// Writes one uploaded file at the virtual path in x-upload-path. Exclusive create: an existing file gives 409, never an overwrite.
+// Same naming as src/uploads.ts candidateName (the runner is a separate build, so the function is repeated here).
+function candidateName(name: string, n: number): string {
+	if (n === 1) return name;
+	const dot = name.lastIndexOf(".");
+	const stem = dot > 0 ? name.slice(0, dot) : name;
+	const ext = dot > 0 ? name.slice(dot) : "";
+	return `${stem}-${n}${ext}`;
+}
+
+// Streams one uploaded file to disk. x-upload-path is the wanted virtual path; x-upload-tries says how many names to try
+// (name, name-2, name-3, ...). The body is written to a hidden temp file first, then hard-linked to the first free name,
+// so an existing file is never overwritten and no part of a body is held in memory. No size limit is applied here.
 async function handleUpload(req: IncomingMessage, res: ServerResponse) {
 	const path = req.headers["x-upload-path"];
-	if (typeof path !== "string" || !path.startsWith(VIRTUAL_ROOT + "/") || !insideWorkspace(path)) {
-		await readRaw(req).catch(() => undefined);
+	const tries = Number(req.headers["x-upload-tries"] ?? 1);
+	if (typeof path !== "string" || !path.startsWith(VIRTUAL_ROOT + "/") || !insideWorkspace(path) || !Number.isInteger(tries) || tries < 1 || tries > 50) {
+		req.resume();
 		return send(res, 400, { ok: false, error: `path is outside the workspace: ${String(path)}` });
 	}
-	const bytes = await readRaw(req);
 	const host = toHost(path);
+	const dir = dirname(host);
+	const base = basename(host);
+	const prefix = path.slice(0, path.length - base.length);
+	mkdirSync(dir, { recursive: true });
+	const tmp = join(dir, `.upload-${randomBytes(8).toString("hex")}`);
 	try {
-		mkdirSync(dirname(host), { recursive: true });
-		writeFileSync(host, bytes, { flag: "wx" });
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "EEXIST") return send(res, 409, { ok: false, error: "exists" });
-		throw error;
+		await pipeline(req, createWriteStream(tmp, { flags: "wx" }));
+		for (let n = 1; n <= tries; n++) {
+			const candidate = candidateName(base, n);
+			try {
+				linkSync(tmp, join(dir, candidate));
+				return send(res, 200, { ok: true, name: candidate, path: prefix + candidate });
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+			}
+		}
+		return send(res, 409, { ok: false, error: "exists" });
+	} finally {
+		rmSync(tmp, { force: true });
 	}
-	return send(res, 200, { ok: true, path });
 }
 
 // Staged folder uploads (see runner/staging.ts). Paths are virtual (/workspace/...) like the other routes.

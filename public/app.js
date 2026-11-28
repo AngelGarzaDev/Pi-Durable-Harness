@@ -279,7 +279,6 @@ document.getElementById("f").onsubmit = (e) => {
 document.getElementById("steer").onclick = () => send("steer");
 
 // File uploads. The server saves each file under a safe name and returns its path in the workspace.
-const MAX_UPLOAD = 15 * 1024 * 1024;
 // A whole folder is limited by its total size, not its file count. Files are still sent one request each.
 const MAX_FOLDER_BYTES = 2 * 1024 * 1024 * 1024;
 let uploadCancelled = false;
@@ -293,7 +292,6 @@ function setUploadBusy(busy) {
 // rel: the file's path inside a picked folder (sent as x-relative-path so the server creates the folders).
 // stageId: when set, the file goes into the folder's staging area instead of its final place (see uploadFolder).
 async function uploadFile(file, query, rel, stageId) {
-	if (file.size > MAX_UPLOAD) return { ok: false, error: file.name + " is too large (15 MB limit)." };
 	const headers = { "x-file-name": encodeURIComponent(file.name) };
 	if (rel !== undefined) headers["x-relative-path"] = encodeURIComponent(rel);
 	if (stageId !== undefined) headers["x-staging-id"] = stageId;
