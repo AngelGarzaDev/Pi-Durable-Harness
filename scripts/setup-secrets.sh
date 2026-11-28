@@ -20,6 +20,8 @@ if [ ! -s secrets/anthropic_api_key ]; then
 fi
 [ -s secrets/app_token ]    || openssl rand -hex 32 > secrets/app_token
 [ -s secrets/runner_token ] || openssl rand -hex 32 > secrets/runner_token
+# Master key for the encrypted secret store (src/secret-store.ts). Keep a copy off the host: losing it makes stored secrets unreadable.
+[ -s secrets/master_key ] || openssl rand -hex 32 > secrets/master_key
 
 # Files are owned by you, mode 600. The containers run as your uid (below), so they can read them.
 chmod 600 secrets/*

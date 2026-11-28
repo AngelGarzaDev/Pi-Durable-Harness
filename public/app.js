@@ -197,6 +197,7 @@ ws.onopen = () => {
 	status.textContent = "connected";
 	ws.send(JSON.stringify({ type: "auth-status" }));
 	ws.send(JSON.stringify({ type: "mcp-list" }));
+	ws.send(JSON.stringify({ type: "secrets-list" }));
 };
 ws.onclose = () => (status.textContent = "disconnected, reload to reconnect");
 ws.onmessage = (e) => {
@@ -237,6 +238,8 @@ ws.onmessage = (e) => {
 		settingsMsg.textContent = msg.message;
 		keyMsg.textContent = msg.message;
 		mcpMsg.textContent = msg.message;
+		secretsMsg.textContent = msg.message;
+		if (msg.message.startsWith("Enter the app token") || msg.message.startsWith("That is not")) secretsNote.textContent = msg.message;
 		instrMsg.textContent = msg.message;
 		if (wsdlg.open) {
 			wsCfgMsg.textContent = msg.message;
@@ -250,6 +253,7 @@ ws.onmessage = (e) => {
 	else if (msg.type === "settings") showSettings(msg);
 	else if (msg.type === "auth") showKey(msg.anthropic);
 	else if (msg.type === "mcp") showMcp(msg);
+	else if (msg.type === "secrets") showSecrets(msg);
 	else if (msg.type === "api-keys") {
 		showApiKeys(msg.keys);
 		voiceMsg.textContent = "";
@@ -644,6 +648,54 @@ document.getElementById("keyform").onsubmit = (e) => {
 keyClear.onclick = () => {
 	if (!confirm("Remove the key entered in the browser? The Docker secret is used again if there is one.")) return;
 	ws.send(JSON.stringify({ type: "auth-clear" }));
+};
+
+// Secrets panel. Names and times only; the server never sends a value. Every change needs a recent app-token check.
+const secretsList = document.getElementById("secretslist");
+const secretsForm = document.getElementById("secretsform");
+const secretsMsg = document.getElementById("secretsmsg");
+const secretsNote = document.getElementById("secretsnote");
+const secretsReauth = document.getElementById("secretsreauth");
+function showSecrets(info) {
+	secretsList.replaceChildren();
+	if (!info.available) {
+		secretsNote.textContent = "The secret store is off on this host: the master key file is missing. Run the one-time host setup (docs/DESIGN.md).";
+		secretsReauth.hidden = true;
+		secretsForm.hidden = true;
+		return;
+	}
+	for (const s of info.names) {
+		const li = document.createElement("li");
+		li.textContent = `${s.name}  (set ${new Date(s.updatedAt).toLocaleString()})`;
+		const del = document.createElement("button");
+		del.type = "button";
+		del.textContent = "Remove";
+		del.disabled = !info.reauthed;
+		del.onclick = () => {
+			if (!confirm(`Remove the secret "${s.name}"?`)) return;
+			ws.send(JSON.stringify({ type: "secrets-remove", name: s.name }));
+		};
+		li.append(" ", del);
+		secretsList.append(li);
+	}
+	secretsReauth.hidden = info.reauthed;
+	secretsForm.hidden = !info.reauthed;
+	secretsNote.textContent = info.reauthed ? "Unlocked. Changes allowed until the window closes." : "Enter the app token to change secrets. Changes need a fresh token within 5 minutes.";
+	secretsMsg.textContent = "";
+}
+secretsReauth.onsubmit = (e) => {
+	e.preventDefault();
+	const token = document.getElementById("secretstoken").value;
+	document.getElementById("secretstoken").value = "";
+	ws.send(JSON.stringify({ type: "secrets-reauth", token }));
+};
+secretsForm.onsubmit = (e) => {
+	e.preventDefault();
+	const name = document.getElementById("secretname").value.trim();
+	const value = document.getElementById("secretvalue").value;
+	document.getElementById("secretvalue").value = "";
+	secretsMsg.textContent = "Saving…";
+	ws.send(JSON.stringify({ type: "secrets-set", name, value }));
 };
 
 // MCP servers panel. Text is set with textContent only; server names and errors come from the server.

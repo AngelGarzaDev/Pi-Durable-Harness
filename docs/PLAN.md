@@ -96,3 +96,14 @@ Stop rules to implement: the model says DONE (marker agreed in the prompt), max 
 
 - [ ] Staged folder upload (user m00500): files go to a hidden staging dir in /workspace; commit by rename on success; discard on cancel; sweep stale. Plan: docs/PLAN-STAGED-FOLDER-UPLOAD.md. Waiting for answers to its 4 questions before step 1.
 - [x] 4.6 Staged folder upload: folder files go to `<target>/.staging/<id>`, renamed into place on commit (clash gives -2), cancel or failure deletes, runner sweeps after 24 h. Tests: tests/staging.test.ts, tests/upload.test.ts.
+
+## Plan: approval-gated push and GUI secrets (design: docs/DESIGN.md, decided 2026-11-28)
+- [x] S1.1 Encrypted secret store (src/secret-store.ts): AES-256-GCM, name bound as AAD, master key file (64 hex), write-only API. Tests: tests/secret-store.test.ts.
+- [x] S1.2 WS messages secrets-list, secrets-reauth (app token, 5 min window per socket), secrets-set, secrets-remove; audit log secrets-audit.log without values. Tests: tests/secrets-ws.test.ts (end to end).
+- [x] S1.3 Config MASTER_KEY_FILE (default /run/secrets/master_key), compose secret master_key, setup-secrets.sh creates it.
+- [x] S1.4 Secrets panel in global settings (names and times only; unlock form; set and remove).
+- [x] S1.5 Dev deploy and live WS check (set/refuse/remove, audit, no plaintext on disk).
+- [ ] S2 Move the Anthropic key into the store (replace credentials.json plaintext path; keep Docker secret fallback).
+- [ ] S3 Bundle push tool: runner makes git bundle, app stores it, approval page lists commits and file names, app pushes main only after click. Policy tests.
+- [ ] S4 Deploy dev, then new prod host (backup app-data first; one SSH step for master key and app token).
+

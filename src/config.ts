@@ -10,6 +10,7 @@ export interface Config {
 	runnerUrl: string;
 	runnerTokenFile: string;
 	tokenFile: string;
+	masterKeyFile: string;
 }
 
 export function loadConfig(env = process.env): Config {
@@ -22,6 +23,7 @@ export function loadConfig(env = process.env): Config {
 		runnerUrl: env.RUNNER_URL ?? "http://127.0.0.1:7000",
 		runnerTokenFile: env.RUNNER_TOKEN_FILE ?? "/run/secrets/runner_token",
 		tokenFile: env.APP_TOKEN_FILE ?? "/run/secrets/app_token",
+		masterKeyFile: env.MASTER_KEY_FILE ?? "/run/secrets/master_key",
 	};
 }
 

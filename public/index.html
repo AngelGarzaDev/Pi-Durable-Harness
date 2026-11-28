@@ -226,6 +226,21 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
       <span id="mcpmsg"></span>
     </form>
   </details>
+  <details id="secrets">
+    <summary>Secrets <span class="muted">(write-only; values are never shown)</span></summary>
+    <p class="muted" id="secretsnote">Enter the app token to change secrets. Changes need a fresh token within 5 minutes.</p>
+    <form id="secretsreauth" class="keyrow">
+      <input id="secretstoken" type="password" autocomplete="off" placeholder="app token">
+      <button type="submit">Unlock for 5 minutes</button>
+    </form>
+    <ul id="secretslist"></ul>
+    <form id="secretsform" class="keyrow" hidden>
+      <input id="secretname" placeholder="name, e.g. github_token" size="18" autocomplete="off">
+      <input id="secretvalue" type="password" placeholder="value (stored encrypted, never shown again)" size="30" autocomplete="off">
+      <button type="submit">Save secret</button>
+      <span id="secretsmsg"></span>
+    </form>
+  </details>
   <p><button type="button" id="globalclose">Close</button></p>
   </dialog>
   <details id="voice">

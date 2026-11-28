@@ -146,6 +146,10 @@ when the answer ends with `DONE` (reason `done`), when the limit is reached (`ca
 empty (`empty`). The transcript shows a "Keep going stopped" line with the reason. The cap
 counts continues since your last message, so a new message starts a fresh count. The `maxTurns` limit still applies on top.
 
+## Secrets (encrypted store)
+
+Secrets you change from the browser (for example a GitHub token) live in `DATA_DIR/secrets.json`, encrypted with AES-256-GCM. The key is `secrets/master_key` (64 hex characters, created by `scripts/setup-secrets.sh`, mode 600, SELinux label `container_file_t`). Keep a copy of the master key off the host: without it, stored secrets cannot be read. Open the Secrets panel in global settings, enter the app token to unlock changes for 5 minutes, then save or remove. Values are never shown again, and each change is logged in `DATA_DIR/secrets-audit.log` without its value. Docker secret files (`secrets/*`) stay as they are until moved in a later step.
+
 ## Upgrading
 
 Earlier versions ran the runner as uid 10001, so the `workspace` volume may be owned by that uid and the
