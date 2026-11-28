@@ -1,18 +1,16 @@
 # STATE (handoff)
 
 ## Current task
-S3 approval-gated push: code, tests and docs written. Next: commit, push, dev deploy, healthz.
+S3 done and pushed (04c8028). Dev redeployed, healthz ok. Next: S4 (dev is current; prod only after asking).
 
 ## Done this session
 - (f) steer test: tests/steer.test.ts, pushed 5e38fe2.
 - (c) per-file upload limit removed (7fe36d6), live check 20 MB on dev OK.
-- S3 (uncommitted at time of writing): runner bundle route, GitPushService, git_push tool with approval card, WS push-decide, tests 244 pass, typecheck clean.
+- S3 committed 954c680, pushed 04c8028: runner bundle route, GitPushService, git_push tool with approval card, WS push-decide, tests 244 pass, typecheck clean.
 
 ## Exact next step
-1. `git add -A && git commit -m "S3: approval-gated git push..."` (after `npm run typecheck && npm test`).
-2. Push with askpass recipe (AGENTS.md), delete the script, record the range in NOTES.
-3. `docker compose up -d --build`, `curl -s http://127.0.0.1:8787/healthz` -> ok.
-4. S4: deploy dev, then prod only after asking (user m00992 b: leave prod alone).
+1. S4 check: a browser run of the approval card on dev (needs a model call; haiku only). Needs GIT_REMOTE_URL set first (user approval).
+2. Prod deploy only after asking (user m00992 b: leave prod alone).
 
 ## How to run and test
 - `npm run typecheck && npm test` (244 tests, about 1 min).
