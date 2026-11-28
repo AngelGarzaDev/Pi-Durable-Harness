@@ -1,109 +1,141 @@
 # pi-durable-web
 
-A single-user browser chat for Claude. The model can run shell, read, write and edit tools,
-but only inside a separate runner container that has no credentials. Built on
-[Pi Durable](https://www.npmjs.com/package/@earendil-works/pi-durable) (experimental).
+A single-user browser chat for Claude. The model can run shell, read, write and edit tools, but only inside
+a separate runner container that holds no credentials. Built on
+[Pi Durable](https://www.npmjs.com/package/@earendil-works/pi-durable), which is experimental.
 
-Features: login with an access token (lockout after repeated failures), dark UI, several chats in a
-sidebar, model and context-limit settings, manual and automatic compaction, steer (joins after the
-current tool step), fork ("branch from here"), reset with optional handoff, a turn limit per run, and an
-optional **answer review**: a second model call checks each answer and retries once. Review is off by
-default and is switched on per chat.
+## Features
 
+- Sign in with an access token. Repeated failed logins lock the client out for a while.
+- Dark browser UI with several chats in a sidebar.
+- Per-chat model and context-limit settings, with manual and automatic compaction.
+- Steer a running answer, branch a chat from any message ("fork"), or reset with an optional handoff.
+- Folders (workspaces) with file and folder uploads.
+- Keep going: the model continues an answer until it reports the task as done.
+- Optional answer review: a second model call checks each answer and retries once.
+- A turn limit for each run and optional web search.
+
+## Contents
+
+- [Requirements](#requirements)
 - [Quick start](#quick-start)
-- [Running without Docker](#running-without-docker-development-only)
-- [Architecture](#architecture)
+- [Using the app](#using-the-app)
 - [Configuration](#configuration)
+- [Networking](#networking)
+- [Secrets](#secrets)
+- [Updating](#updating)
+- [Running without Docker](#running-without-docker)
+- [Architecture](#architecture)
 - [Tests and checks](#tests-and-checks)
-- [Security](SECURITY.md)
-- More: [docs/DESIGN.md](docs/DESIGN.md) (design and decisions), [docs/NOTES.md](docs/NOTES.md) (log of decisions and Pi Durable quirks)
+- [Documentation](#documentation)
+- [License](#license)
+
+## Requirements
+
+- Docker with Docker Compose (`docker compose`).
+- An Anthropic API key.
+- For development without Docker: Node.js 22.19 or newer.
+
+> **Warning:** The app serves plain HTTP. Use it only for yourself on a trusted network, and do not expose
+> it to the internet. Put HTTPS in front of it, and set `SECURE_COOKIES=1`, before using it beyond localhost.
+> See [SECURITY.md](SECURITY.md).
 
 ## Quick start
 
-You need Docker with Compose and an Anthropic API key. This is for a trusted single user on your own
-machine. It serves plain HTTP on port 8787 on all host interfaces, so other devices on your LAN can open it. Do not expose it to the internet, and put HTTPS in front of it before using it outside a trusted network. Set `APP_BIND=127.0.0.1` to keep it local only.
+Run these commands from the repository root, as your normal user (not root):
 
 ```sh
 git clone https://github.com/AngelGarzaDev/Pi-Durable-Harness.git
 cd Pi-Durable-Harness
 
-# Creates secrets/ (mode 600, owned by you), asks for your Anthropic key (input hidden),
-# and writes .env with your uid/gid so the containers can read the secrets.
-# Run it as your normal user, not as root. Safe to re-run: existing secrets are kept.
-./scripts/setup-secrets.sh
-
-docker compose up -d --build
+./scripts/setup-secrets.sh          # asks for your Anthropic key (input hidden) and creates the secrets
+docker compose up -d --build        # builds the images and starts both containers
 curl -s http://127.0.0.1:8787/healthz   # prints: ok
 ```
 
-Then open <http://127.0.0.1:8787> and sign in with the contents of `secrets/app_token`
-(`cat secrets/app_token` prints it).
-
-Manual alternative to `setup-secrets.sh`, same result:
+Then open <http://127.0.0.1:8787> and sign in with the access token, which is the contents of
+`secrets/app_token`:
 
 ```sh
-# Run from the repo root, as your normal user (not root).
-umask 077                                    # files you create are readable only by you
-mkdir -p secrets
-
-read -rsp "Anthropic API key: " key; echo    # input hidden; must start with sk-ant-
-printf '%s\n' "$key" > secrets/anthropic_api_key && unset key
-openssl rand -hex 32 > secrets/app_token     # the login token you type in the browser
-openssl rand -hex 32 > secrets/runner_token  # shared by app and runner; never typed in
-
-chmod 600 secrets/*
-printf 'HOST_UID=%s\nHOST_GID=%s\n' "$(id -u)" "$(id -g)" > .env   # containers run as your uid/gid
-
-# Only on SELinux Enforcing systems (Fedora, Bazzite, RHEL), otherwise skip:
-# chcon -t container_file_t secrets/*
-
-docker compose up -d --build
-curl -s http://127.0.0.1:8787/healthz        # prints: ok
+cat secrets/app_token
 ```
 
-The containers run as your uid and gid, so the secret files must be owned by you. If you ran an
-earlier version that used another runner uid, see "Upgrading" below.
+By default the app listens on all host interfaces, so other devices on your network can reach it at
+`http://<your-host-ip>:8787`. To keep it on this machine only, set `APP_BIND=127.0.0.1` before you run
+`docker compose up`.
 
-Stop with `docker compose down`. Chats are kept in the `app-data` volume and files the model writes are in
-the `workspace` volume. `docker compose down -v` deletes both volumes.
+To stop the stack, run `docker compose down`. Chats are kept in the `app-data` volume and files written by
+the model are kept in the `workspace` volume. `docker compose down -v` deletes both volumes.
 
-### Runner internet access
+## Using the app
 
-The runner has internet access by default (its `egress` network is a normal bridge), so the model can fetch
-URLs and install packages. It has no credentials, and it cannot reach the app's secrets. To cut it off, remove
-`egress` from the runner's `networks:` in `compose.yaml` and redeploy. `compose.internet.yaml` is now a no-op,
-kept so older commands still run. Since 2026-11-28 (user decision, m00826) this default replaces the
-earlier internal-only default; the risk is recorded in `SECURITY.md` and `docs/DESIGN.md`.
+### Chats
 
-## Running without Docker (development only)
+- **+ New chat** starts a chat in the sidebar. Chats are listed newest first.
+- Each chat has its own model, context limit, maximum tool rounds and review setting.
+- **Steer** adds your message to an answer that is still in progress. It joins after the current tool step
+  finishes; the answer does not stop. The button's tooltip says the same.
+- **Fork** ("branch from here") creates a new chat from an earlier message, leaving the original unchanged.
+- **New context** starts a fresh context. Earlier messages stay visible, but the model stops seeing them. You can
+  include a handoff summary.
+- **Compact** summarizes older messages to free room in the context. Compaction also runs automatically when the
+  context nears its limit.
+- **Abort** stops the current run.
 
-Needs Node 22.19 or newer. Without Docker the runner runs on your machine with your permissions,
-so only do this for development. Stop the Docker stack first (`docker compose down`), because both use port 8787.
+### Folders and uploads
 
-```sh
-npm ci
-mkdir -p data workspace
+Each chat works in a folder (workspace). The model reads and writes files there.
 
-# App settings. Paths are relative to the repo root.
-export ANTHROPIC_API_KEY_FILE=secrets/anthropic_api_key APP_TOKEN_FILE=secrets/app_token \
-       RUNNER_TOKEN_FILE=secrets/runner_token DATA_DIR=./data
+- **Attach** uploads a file into the chat's folder. The saved path is added to your message.
+- **Folder** uploads a whole folder and keeps its structure (up to 8 levels deep). The uploaded folder's
+  total size may be up to 2 GB. Each file may be up to 15 MB.
+- A folder upload is all or nothing. Files are first written to a hidden `.staging/<id>` folder and the
+  whole folder is moved into place only when every file has arrived. A cancelled or failed upload is removed,
+  so the model never sees a partial folder. Staging folders older than 24 hours are removed by the runner.
+- If a name is already taken, the upload is saved with a suffix such as `-2` or `-3`. Existing folders are
+  never merged.
+- Leading dots are removed from names, so `.github` is saved as `github`.
+- A chat with no folder uploads to `/workspace/uploads`.
 
-# Terminal 1: the runner (shell and file tools), bound to localhost, working in ./workspace
-RUNNER_HOST=127.0.0.1 WORKSPACE_DIR=./workspace node --import tsx runner/server.ts
+### Keep going
 
-# Terminal 2: the app, then open http://127.0.0.1:8787
-npm start
-```
+Keep going is off by default. Turn it on for a chat with the **Keep going** checkbox and choose a limit
+of 3, 5, 10 or 20 rounds (default 5). When it is on, the model ends its final message with a line that
+contains only `DONE`. If an answer does not end with `DONE`, the app sends a "[Keep going]" message and the
+model continues, up to the limit. The loop stops when:
 
-## Architecture
+| Reason | Meaning |
+|---|---|
+| `done` | The answer ends with `DONE`. |
+| `cap` | The limit was reached. Send a message to continue. |
+| `empty` | The last answer was empty. |
 
-| Part | Where | Holds |
-|---|---|---|
-| `app` (`src/`, `public/`) | web UI, login, model calls, chat storage (`node:sqlite`) | Anthropic key, login token |
-| `runner` (`runner/`) | shell and file tools inside `/workspace` | runner token only |
+The transcript shows a "Keep going stopped" line with the reason. The count starts again each time you send a
+message. The maximum tool rounds limit still applies to each run.
 
-The app talks to the runner over HTTP with a bearer token. The runner refuses any path that
-resolves outside `/workspace`, including through symlinks, and refuses dangling symlinks.
+### Answer review
+
+Review is off by default and is turned on per chat. When it is on, a second model call checks each answer
+before it is final. If the reviewer finds a problem, the model gets one retry. The review result is shown
+in the transcript.
+
+### Turn limit
+
+A run may use at most a set number of tool rounds, the **maximum tool rounds** setting (default 50, from 1
+to 500). When a run reaches the limit, it stops. The answer is recorded as unanswered with reason
+`turn_limit`.
+
+### Web search
+
+The model has four web tools: `web_search`, `fetch_content`, `get_search_content` and `source_check`. They
+come from the [pi-web-access](https://www.npmjs.com/package/pi-web-access) package and run inside the app
+container. Without any configuration, search uses a provider that needs no API key.
+
+To use other providers or add API keys, create `web-search.json` in `DATA_DIR/web-access/` (for example,
+with a `searxngBaseUrl` value). Keys are read only from that file and are never printed.
+
+The runner has internet access by default, so the model can also fetch pages directly. See
+[Networking](#networking).
 
 ## Configuration
 
@@ -112,76 +144,154 @@ Anthropic key is always read from a file, never from an environment variable.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `HOST` / `PORT` | `127.0.0.1` / `8787` | app listen address (the container sets `0.0.0.0`; Compose publishes it on `${APP_BIND:-0.0.0.0}`, set `APP_BIND=127.0.0.1` for local only) |
-| `DATA_DIR` | `./data` | chats, settings, session database |
-| `ANTHROPIC_API_KEY_FILE` | `/run/secrets/anthropic_api_key` | Anthropic key file |
-| `APP_TOKEN_FILE` | `/run/secrets/app_token` | login token file |
-| `RUNNER_URL` | `http://127.0.0.1:7000` | runner base URL |
-| `RUNNER_TOKEN_FILE` | `/run/secrets/runner_token` | shared app/runner token file |
-| `ANTHROPIC_MODEL` | `claude-haiku-5-5` | default model for new chats |
-| `SECURE_COOKIES` | off | set to `1` when served over HTTPS (adds the `Secure` cookie flag) |
-| `RUNNER_HOST` / `RUNNER_PORT` / `WORKSPACE_DIR` | `0.0.0.0` / `7000` / `/workspace` | runner listen address, port and workspace directory |
+| `HOST` | `127.0.0.1` | App listen address. The container sets `0.0.0.0`. |
+| `PORT` | `8787` | App listen port. |
+| `APP_BIND` | `0.0.0.0` | Compose only: host address the app port is published on. Set `127.0.0.1` to keep it local. |
+| `DATA_DIR` | `./data` | Chats, settings, secrets, API keys, MCP configuration and the session database. |
+| `ANTHROPIC_MODEL` | `claude-haiku-5-5` | Default model for new chats. |
+| `ANTHROPIC_API_KEY_FILE` | `/run/secrets/anthropic_api_key` | File that holds the Anthropic key. |
+| `APP_TOKEN_FILE` | `/run/secrets/app_token` | File that holds the sign-in token. |
+| `RUNNER_TOKEN_FILE` | `/run/secrets/runner_token` | File that holds the token shared by the app and the runner. |
+| `MASTER_KEY_FILE` | `/run/secrets/master_key` | File that holds the master key for the encrypted secret store. |
+| `RUNNER_URL` | `http://127.0.0.1:7000` | Base URL of the runner, as seen by the app. |
+| `RUNNER_HOST` | `0.0.0.0` | Runner listen address. |
+| `RUNNER_PORT` | `7000` | Runner listen port. |
+| `WORKSPACE_DIR` | `/workspace` | Directory the runner's tools may use. |
+| `SECURE_COOKIES` | off | Set to `1` when the app is served over HTTPS. This adds the `Secure` flag to the session cookie. |
 
-Chat settings (model, context limit, maximum tool rounds, review) are changed in the browser and saved in
-`DATA_DIR/settings.json`. The default context limit is 100,000 tokens.
+The default context limit for chats is 100,000 tokens.
 
-### Uploading files and folders
-In a chat, the **Attach** button uploads files and **Folder** uploads a whole folder; the saved paths are added to your message. In the workspace dialog, the file and folder pickers save into that workspace's folder. Folders keep their structure (up to 8 levels) and may be up to 2 GB in total. A folder upload is all-or-nothing: its files are written to a hidden `.staging/<id>` folder inside the target, and the whole folder is renamed into place only when every file has arrived. A cancelled or failed folder upload is deleted, and the model never sees a partial folder. A folder whose name is taken gets `-2`, `-3` and so on (never merged). Each file is still limited to 15 MB by the server; a larger file fails during the upload and the whole folder is discarded. Leftover staging folders older than 24 hours are removed by the runner (hourly sweep). Single files are not staged. A chat with no folder uploads to `/workspace/uploads`. Names are cleaned: leading dots are dropped, so `.github` is saved as `github`.
+Global settings (model, context limit, maximum tool rounds) are changed in the browser and saved in
+`DATA_DIR/settings.json`. Keep going, review and voice tool use are set per chat or per folder in the browser.
 
-### Web search
+## Networking
 
-The model has `web_search`, `fetch_content`, `get_search_content` and `source_check` (as `mcp__web__*`). They come
-from Pi's `pi-web-access` package (pinned in `package.json`), which runs inside the app container. Without any
-configuration it searches with a keyless provider. To change providers or add API keys, put a `web-search.json`
-in `DATA_DIR/web-access/` (for example `searxngBaseUrl`). Keys live only in that file on the data volume and are
-never printed. The runner has internet access by default (see above). The name `web` is reserved in `mcp.json`.
+Docker Compose creates three networks:
 
-### Keep going
+| Network | Purpose |
+|---|---|
+| `edge` | Normal bridge. The app reaches the Anthropic API through it. |
+| `tools` | Internal (no route outside). The app and the runner talk to each other through it. |
+| `egress` | Normal bridge. The runner reaches the internet through it. |
 
-Off by default, per chat ("Keep going" checkbox, rounds picker: 3/5/10/20, default 5). When on, the system
-prompt asks the model to end its final message with a line containing only `DONE`. If an answer does not end
-with `DONE`, the app sends "[Keep going] ..." and the model continues, up to the rounds limit. The loop stops
-when the answer ends with `DONE` (reason `done`), when the limit is reached (`cap`), or when the answer is
-empty (`empty`). The transcript shows a "Keep going stopped" line with the reason. The cap
-counts continues since your last message, so a new message starts a fresh count. The `maxTurns` limit still applies on top.
+**Runner internet access is on by default.** The runner has no credentials and cannot reach the app's
+secrets, but the model can fetch URLs and install packages. To turn it off, remove `egress` from the runner's
+`networks:` list in `compose.yaml`, then run `docker compose up -d --build`.
 
-## Secrets (encrypted store)
+`compose.internet.yaml` is a no-op kept for compatibility. It adds nothing.
 
-Secrets you change from the browser (for example a GitHub token) live in `DATA_DIR/secrets.json`, encrypted with AES-256-GCM. The key is `secrets/master_key` (64 hex characters, created by `scripts/setup-secrets.sh`, mode 600, SELinux label `container_file_t`). Keep a copy of the master key off the host: without it, stored secrets cannot be read. Open the Secrets panel in global settings, enter the app token to unlock changes for 5 minutes, then save or remove. Values are never shown again, and each change is logged in `DATA_DIR/secrets-audit.log` without its value. Docker secret files (`secrets/*`) stay as they are until moved in a later step.
+### Giving the runner access to your LAN
 
-## Upgrading
-
-Earlier versions ran the runner as uid 10001, so the `workspace` volume may be owned by that uid and the
-runner cannot write to it. Fix it once, keeping your files (replace `1000` with your uid if different):
+`compose.lan.yaml` adds a `lan` network so the runner can reach devices on your local network:
 
 ```sh
-docker run --rm --user 0 --entrypoint sh -v pi-durable-web_workspace:/workspace pi-durable-web-runner:local -c 'chown -R 1000:1000 /workspace'
-docker compose up -d --build
+docker compose -f compose.yaml -f compose.lan.yaml up -d --build
 ```
 
-Fresh installs do not need this.
+Compose cannot limit this network to the LAN. It also lets the model reach services on the host, such as SSH,
+and devices on your LAN. Use it only when you need it. A host firewall rule is needed to restrict it further.
 
-### Updating an install
+## Secrets
 
-Your chats, folders, settings and keys live in the `app-data` volume, and workspace files in `workspace`. An update
-rebuilds the containers and keeps both volumes, so nothing is lost. Before updating, back up the app data:
+`./scripts/setup-secrets.sh` creates these files in `secrets/`:
+
+| File | Contents |
+|---|---|
+| `anthropic_api_key` | Your Anthropic key. The script refuses any value that does not start with `sk-ant-`. |
+| `app_token` | The sign-in token, 64 hex characters. |
+| `runner_token` | The token shared by the app and the runner. You never type it. |
+| `master_key` | The master key for the encrypted secret store, 64 hex characters. |
+
+The script also writes `.env` with your user ID and group ID. The containers run as that user, so they can
+read the files. The files are mode 600 and owned by you. The script never overwrites an existing secret, so
+it is safe to run again.
+
+The script is the recommended way to create secrets. To create them by hand, run these commands from the repo
+root, as your normal user:
+
+```sh
+umask 077 && mkdir -p secrets
+read -rsp "Anthropic API key: " key; echo && printf '%s\n' "$key" > secrets/anthropic_api_key && unset key
+openssl rand -hex 32 > secrets/app_token
+openssl rand -hex 32 > secrets/runner_token
+openssl rand -hex 32 > secrets/master_key
+chmod 600 secrets/*
+printf 'HOST_UID=%s\nHOST_GID=%s\n' "$(id -u)" "$(id -g)" > .env
+```
+
+On systems with SELinux in enforcing mode (Fedora, Bazzite, RHEL), also run `chcon -t container_file_t secrets/*`.
+
+### Encrypted secret store
+
+Secrets you enter in the browser, such as a GitHub token, are stored in `DATA_DIR/secrets.json`. Each value is
+encrypted with AES-256-GCM using `secrets/master_key`. Values are write-only: once saved, they are never shown
+again. Each change is recorded in `DATA_DIR/secrets-audit.log`, without the value.
+
+To change a secret, open the Secrets panel in the global settings and enter the app token. Changes are allowed
+for 5 minutes after you enter it.
+
+**Keep a copy of `secrets/master_key` somewhere off this machine.** Without it, the stored secrets cannot be
+decrypted. Anyone who has both the master key and a copy of `app-data` can read the stored secrets.
+
+## Updating
+
+Your chats, folders, settings and keys are kept in the `app-data` volume. Workspace files are kept in the
+`workspace` volume. Updating rebuilds the containers and keeps both volumes. Secret files are not changed.
+
+Back up the app data before you update:
 
 ```sh
 docker run --rm -v pi-durable-web_app-data:/data:ro alpine tar czf - -C /data . > app-data-$(date +%F).tgz
 ```
 
-Then update the code and redeploy:
+Update the code and redeploy:
 
 ```sh
-git pull --ff-only origin main        # or copy the new files over your checkout
-docker compose up -d --build          # rebuilds the app and runner images and restarts them
-curl -s http://127.0.0.1:8787/healthz # should print: ok
+git pull --ff-only origin main          # or copy the new files over your checkout
+docker compose up -d --build            # rebuilds the images and restarts the containers
+curl -s http://127.0.0.1:8787/healthz   # prints: ok
 ```
 
-If the new version needs a change to the Upgrading steps above, follow those first. Check the commit with
-`git log --oneline -1`. To go back, check out the previous commit and run the same `docker compose up -d --build`.
-Your data stays, but a schema change in a newer version may not work on an older one, so take the backup first.
-Secret files (`secrets/`) are not touched by an update.
+Check the running commit with `git log --oneline -1`.
+
+To roll back, check out the previous commit and run `docker compose up -d --build` again. Volumes are kept, but a
+newer version may change the data format in a way an older version cannot read. Always take the backup first.
+
+## Running without Docker
+
+Use this only for development. Without Docker, the runner runs on your machine with your permissions. Stop the
+Docker stack first (`docker compose down`), because both use port 8787.
+
+```sh
+npm ci
+mkdir -p data workspace
+
+# App settings. Paths are relative to the repo root.
+export ANTHROPIC_API_KEY_FILE=secrets/anthropic_api_key APP_TOKEN_FILE=secrets/app_token \
+       RUNNER_TOKEN_FILE=secrets/runner_token MASTER_KEY_FILE=secrets/master_key DATA_DIR=./data
+
+# Terminal 1: the runner (shell and file tools), on localhost, working in ./workspace
+RUNNER_HOST=127.0.0.1 WORKSPACE_DIR=./workspace npm run start:runner
+
+# Terminal 2: the app, then open http://127.0.0.1:8787
+npm start
+```
+
+`MASTER_KEY_FILE` must be set so the app can open the secret store. Generate the four files in `secrets/` as
+described in [Secrets](#secrets).
+
+## Architecture
+
+| Part | Location | Holds |
+|---|---|---|
+| `app` | `src/`, `public/` | Web UI, sign-in, model calls, chat storage (`node:sqlite`). Holds the Anthropic key and the app token. |
+| `runner` | `runner/` | Shell and file tools inside `/workspace`. Holds the runner token only. |
+
+The app calls the runner over HTTP with a bearer token. The runner refuses any path that resolves outside
+`/workspace`, including paths that go through symbolic links, and refuses dangling symbolic links.
+
+Both containers run as your user ID and group ID. Compose runs them with a read-only root filesystem, no Linux
+capabilities and `no-new-privileges`.
 
 ## Tests and checks
 
@@ -190,22 +300,23 @@ npm run typecheck
 npm test
 ```
 
-`npm test` runs unit tests and HTTP tests that start the real app and runner as child processes.
-No test calls a paid model. The live checks in `scripts/` do call the model and are run by hand
-(see the header of each file). They need a running app.
+`npm test` runs unit tests and HTTP tests. The HTTP tests start the real app and runner as child processes.
+No test calls a paid model. The live checks in `scripts/` do call the model. Run them by hand, and read the
+header of each file first. They need a running app.
+
+## Documentation
+
+| Document | For |
+|---|---|
+| [SECURITY.md](SECURITY.md) | Security model, accepted risks, how to report a problem. |
+| [docs/PRODUCTION.md](docs/PRODUCTION.md) | Operators: deploying and rolling back a production copy. |
+| [docs/DESIGN.md](docs/DESIGN.md) | Developers: design, decisions and open questions. |
+| [docs/HOME-ASSISTANT.md](docs/HOME-ASSISTANT.md) | Home Assistant voice integration through the OpenAI-compatible API. |
+
+The full index is in [docs/README.md](docs/README.md).
 
 ## License
 
 Copyright (C) the authors. Licensed under the GNU Affero General Public License v3.0 or later
-(AGPL-3.0-or-later), see [LICENSE](LICENSE). If you run a modified version as a network service,
-you must offer its source to its users.
-
-### Giving the runner access to the LAN
-
-`compose.lan.yaml` adds a `lan` network, so the runner can reach the LAN (it already has internet access by default):
-
-```sh
-docker compose -f compose.yaml -f compose.lan.yaml up -d --build
-```
-
-This also lets the agent reach host services (for example SSH on the host) and LAN devices. Compose cannot limit it to the LAN only.
+(AGPL-3.0-or-later). See [LICENSE](LICENSE). If you run a modified version as a network service, you must offer
+its source code to its users.

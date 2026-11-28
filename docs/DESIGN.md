@@ -1,193 +1,188 @@
-# Pi Durable Web GUI: plan
+# Design
 
-Status: Phase 0 done (scaffold, deps installed, `tsc` clean, harness opens). Not deployed. Phases 1-5 pending.
+This document records how pi-durable-web is built, the decisions behind it, and what is still open. It is the
+reference for developers. For how to run the app, see the [README](../README.md). For the security model, see
+[SECURITY.md](../SECURITY.md).
 
-## Decisions (confirmed by user, m00046)
+## Goals
 
-- **Model:** Claude via pi-ai `anthropicProvider()` (`@earendil-works/pi-ai/providers/anthropic`). Default model `claude-sonnet-5` (configurable). Auth: user asked for OAuth instead of an API key (m00076). Plan: pi-ai `anthropicProvider()` OAuth (Claude Pro/Max) via the app's own login page, using the copy-code flow (no callback port needed in the container). Credentials go to a `CredentialStore` file under `/data` (0600), refreshed by pi-ai `Models`. API key remains a fallback via `ANTHROPIC_API_KEY`. Pi's own `~/.pi/agent/auth.json` login is NOT shared (two clients rotating one refresh token can break each other).
-- **Tools:** full `read`, `write`, `edit`, `bash` (`@earendil-works/pi-durable/tools`). Write scope is limited by Docker: the container is the sandbox, and only a dedicated workspace volume is mounted. The Docker socket and host paths are NOT mounted.
-- **Network:** LAN/localhost only for now. Bind `127.0.0.1:8787` first; LAN binding later if wanted.
-- **Front end:** modern stack. Plan: React + TypeScript + Vite (`react`, `react-dom`, `vite` already installed as dev deps).
+A browser UI, served from this host in a Docker container, where you can:
 
-Available Claude model ids in pi-ai 1.6-era catalog include claude-sonnet-5, claude-sonnet-5-5, claude-opus-5, claude-opus-5-5, claude-haiku-5-5, claude-sonnet-4-6, claude-opus-4-8.
-
-## Phase 0 record
-
-- Project: `<repo>/` (`package.json` type=module, `tsconfig.json`, `src/check.ts` smoke check, `public/`).
-- Deps: `@earendil-works/pi-durable@1.6.0`, `@earendil-works/pi-ai`, `@earendil-works/chord`, `ws`; dev: typescript, tsx, @types/node, @types/ws, vite, react, react-dom, @types/react, @types/react-dom.
-- Verified: `npx tsc --noEmit` passes; `npx tsx src/check.ts` opens a Harness (`MemoryStorage`, anthropic provider).
-- Note: npm warned about install scripts (protobufjs postinstall) and was not approved; harmless for now.
-
-## Goal
-
-A browser UI served from this host (the host) in a Docker container. From a web page you can:
-
-1. Create and list conversations (root and forks).
+1. Create and list chats, including forks.
 2. Send messages and watch the answer stream in live.
 3. See tool calls and their output as they run.
-4. Steer a running agent or queue a follow-up.
-5. Reopen the page after a reload or from another device and resume the same view.
+4. Steer a running answer, or queue a follow-up.
+5. Reload the page or open it from another device and resume the same view.
 6. Survive a container restart: unfinished work resumes from SQLite storage.
 
-Non-goals for v1: multi-user accounts, a full coding-agent toolset on the host (see Decisions), mobile layout polish.
+Non-goals: multi-user accounts, and mobile layout polish.
 
-## Host facts that shape the plan (checked read-only)
+## Decisions
 
-- Docker is running. Only `llama_cpp` is a container, on `0.0.0.0:9931 -> 8080`. Do not touch it.
-- Node v24.22.1 on the host. `@earendil-works/pi-durable` 1.6.0 on npm needs Node >= 22.19.0.
-- Ports 8080 is in use by nothing listed, but 9931 is taken. Proposed app port: **8787** (confirm it is free at deploy time).
-- `/var` has 323 GiB free.
-- Storage for the app: a named Docker volume, or a bind mount under `<repo>/data`. Proposed: bind mount, so the SQLite file is easy to back up.
+Each decision is stated with its reason.
 
-## Decisions to confirm (open questions)
-
-1. **Model provider.** Options:
-   - (a) The local `llama_cpp` server at `http://<lan-ip>:9931/v1` (OpenAI-compatible, free, private). I need to confirm the loaded model name and that it supports tool calls.
-   - (b) OpenAI or another hosted provider, using an API key you provide via an env file. Not stored in git.
-   - Recommendation: (a) with (b) as an option.
-2. **Tools the agent gets.** The `@earendil-works/pi-durable/tools` package gives `read`, `write`, `edit`, and `bash`. On a container, `bash` and `write` act on the container filesystem. Recommendation: start with no tools, or only read-only tools, mounting a single read-only workspace. Enable write/bash only after you approve it.
-3. **Network exposure.** Recommendation: bind to the LAN address `<lan-ip>` only, not `0.0.0.0`, and require a shared access token (set in an env file, sent as a cookie or header). Nothing is exposed to the internet, and no firewall rule is added without your approval.
-4. **Front end.** Recommendation: a single-page app with plain HTML/JS and no build step, served by the same server. Keeps the dependency count low. Alternative: React + Vite if you want a richer UI later.
-5. **Transport.** Recommendation: WebSocket. The server sends the `conversation.watch()` operations to the browser, and the browser sends submit/steer/queue messages back. Server-Sent Events are a simpler fallback if WebSocket causes trouble.
+- **Model provider: Claude through the Anthropic API.** The app uses pi-ai's `anthropicProvider()`. The default
+  model is `claude-haiku-5-5` (set with `ANTHROPIC_MODEL`).
+- **Credentials: an Anthropic API key read from a Docker secret file.** The key is read once at startup by
+  `readApiKey` in `src/config.ts`, which requires the `sk-ant-` prefix. It is never an environment variable and
+  never logged. A key saved in the browser is stored in `credentials.json` in the data volume (mode 600) and takes
+  precedence over the Docker secret. A Claude Pro/Max OAuth login was considered and not used. Pi's own
+  `~/.pi/agent/auth.json` must not be shared with a second client, because two clients rotating one refresh
+  token can break each other.
+- **Tools: `read`, `write`, `edit` and `bash`** from `@earendil-works/pi-durable/tools`. They run only in the
+  `runner` container, which mounts only the `workspace` volume. The Docker socket and host paths are not mounted.
+- **Runner internet access is on by default** (`egress` network). The model needs to fetch pages and install
+  packages. Removing `egress` turns it off. The trade-off is listed under Accepted risks in
+  [SECURITY.md](../SECURITY.md).
+- **Front end: plain HTML and JavaScript in `public/`, with no build step.** This keeps the dependency count low.
+  React was considered for a richer UI later and has not been started.
+- **Transport: WebSocket for the live view.** The server pushes the full conversation view on each change. The
+  browser sends `submit`, `steer`, `abort` and settings messages. HTTP serves static files, `/healthz`, and the
+  OpenAI-compatible API under `/v1`.
+- **Storage: `node:sqlite`** for the Pi Durable session. Chats, folders, settings and secrets are files under
+  `DATA_DIR`. A Pi Durable `Harness` is opened on the session database and resumed on start.
+- **Network exposure: plain HTTP on all host interfaces by default**, so devices on the LAN can reach it.
+  `APP_BIND=127.0.0.1` restricts it to localhost. The app is not meant for the internet.
+- **Port 8787** for the development stack. Port 8790 is used by the production copy (see
+  [PRODUCTION.md](PRODUCTION.md)).
+- **Pinned versions.** `@earendil-works/pi-durable` is pinned to `1.6.0` and not upgraded between releases. Pi
+  Durable is experimental, and its API changes between releases.
 
 ## Architecture
 
 ```
-browser (SPA)  <--WebSocket / HTTP-->  server (Node, Express-free http + ws)
-                                          |
-                                     Harness (pi-durable)
-                                          |
-                                  SQLite file in /data  (volume)
-                                          |
-                              model: llama_cpp or OpenAI-compatible
+browser (public/)  --WebSocket / HTTP-->  app container (src/)
+                                              |  bearer token
+                                              v
+                                          runner container (runner/)  -->  /workspace (volume)
+                                              |
+                                          SQLite in DATA_DIR (volume app-data)
 ```
 
-Server responsibilities:
-- Open one `Harness` with `openNodeSqliteStorage("/data/session.sqlite")` and `harness.resume()` on start.
-- `GET /api/conversations`, `POST /api/conversations` (create or fork), `GET /api/conversations/:id/view` (current view via `viewState`).
-- WebSocket `/ws`: per-conversation subscribe (`watch` / `viewState` with live updates), submit input (with `requestId` for retries), steer (`whenBusy: "steer"`), and abort.
-- Auth check on every HTTP route and on the WebSocket upgrade.
-- Health route `GET /healthz` for Docker.
+Server responsibilities (`src/`):
 
-Front end responsibilities:
-- Conversation list, transcript pane, streaming answer, tool-call cards with live output, input box with send/steer/queue, abort button.
-- Reconnect with backoff; on reconnect, reload the view and re-subscribe.
+- Open one Pi Durable `Harness` on `DATA_DIR`, and call `harness.resume()` on start.
+- Chat list and create (including fork), per-chat view, and settings.
+- WebSocket `/ws` for live views, submit, steer and abort. The upgrade checks the session cookie and `Origin`.
+- Sign-in with the app token, login rate limiting, and `GET /healthz`.
+- OpenAI-compatible `GET /v1/models` and `POST /v1/chat/completions` for Home Assistant (see
+  [HOME-ASSISTANT.md](HOME-ASSISTANT.md)).
 
-## Phases
+Front end responsibilities (`public/`):
 
-### Phase 0: Scaffold (no deployment)
-- Create the project in `<repo>/`: `package.json` (ESM, Node 22+), `tsconfig.json`, `src/server.ts`, `public/index.html`, `public/app.js`, `public/style.css`.
-- Install `@earendil-works/pi-durable`, `@earendil-works/pi-ai`, `@earendil-works/chord`, `ws`.
-- Verify: `npm run build` and `npm start` on the host, from a shell, with the faux provider (no model needed).
+- Chat list, transcript with streaming answers and tool-call cards, input box with Send, Steer, Attach, Folder,
+  Compact, New context and Abort.
+- Reconnect after a dropped connection, then reload the view and subscribe again.
 
-### Phase 1: Core server
-- Harness open/resume, conversation CRUD, view/watch over WebSocket, submit/steer/abort, token auth, `/healthz`.
-- Verify: a test script submits a message through the WebSocket with the faux provider and sees the streamed result.
+## Security model
 
-### Phase 2: Browser UI
-- Build the SPA against the Phase 1 API. Test in a browser on the LAN.
-- Verify: send a message, reload the page mid-answer, and see the same transcript resume.
+Requirements:
 
-### Phase 3: Model wiring
-- Wire the chosen provider (llama_cpp or hosted), chosen with you in the open questions.
-- Verify: a real answer from the model; check that `llama_cpp` is still healthy.
-
-### Phase 4: Docker
-- `Dockerfile` (node:24-slim, non-root user, multi-stage build), `docker-compose.yml` (port bound to `<lan-ip>:8787:8787`, volume `./data:/data`, env file `./.env`, `restart: unless-stopped`, healthcheck on `/healthz`).
-- `.env.example` committed; real `.env` git-ignored and never printed.
-- Build and run with `docker compose up -d --build`. Confirm with `docker ps` that `llama_cpp` is unaffected.
-- Verify: restart the container mid-run and confirm the work resumes (this tests the durable part).
-
-### Phase 5: Operations
-- Backup note: copy `data/session.sqlite` while stopped, or use the SQLite `.backup` command.
-- Add a README with run, stop, logs, and rotate-token steps.
-- Optional: a systemd user unit or Docker's restart policy handles boot. Lingering is off per AGENTS.md, so the container only comes up when Docker itself starts (Docker is a system service, so this works without login).
-
-## Risks
-
-- **Experimental library.** The API can change between releases. Pin exact versions in `package.json` and record the pin in the README.
-- **Node version.** Requires Node >= 22.19. The Docker image uses Node 24, so the host and container match.
-- **Crash loops.** The library caps restarts (`settings.restartLimit`, default 5), so a bad request should not loop forever. Still, watch the logs after the first deploy.
-- **Exposure.** Even on the LAN, the agent can act if tools are enabled. Token auth and the default no-tools setting are the main guards.
-- **AGENTS.md rules.** Any host change (firewall rule, system service, port use) needs your confirmation. Container changes to `llama_cpp` need confirmation too; this plan does not touch it.
-
-## Open items
-
-1. User to provide `ANTHROPIC_API_KEY` (put in `durable-web/.env`, never printed or committed).
-2. Confirm Phase 1 (core server) start.
-3. Auth for the web page: even on localhost, a token is still recommended before LAN exposure.
-
-## Security model (user requirements, m00102)
-
-Requirements: (1) the Anthropic token must not be reachable by the agent; (2) no process runs as root; (3) the agent can only touch its workspace directory.
+1. The Anthropic key must not be reachable by the agent.
+2. No process runs as root.
+3. The agent can only touch its workspace directory.
 
 Design: two containers, split by trust.
 
-- **`app` container (harness):** runs the Pi Durable Harness, the web UI, the login flow, and the model calls. Holds the OAuth credential file (`/data/credentials.json`, 0600, owned by its UID). Has NO shell tools and NO workspace write access. Its API is not reachable from the runner.
-- **`runner` container (tools):** runs `bash`, `read`, `write`, `edit` only. Has NO credentials, NO `/data`, and no mount except `/workspace` (named volume). It exposes a small internal HTTP API (exec/read/write), reachable only from `app` on an internal Docker network.
-- The harness uses a custom `ExecutionEnv` (pi-durable `env` option, see README "Environment") that forwards tool calls to the runner. So the agent's tools run in `runner`, and the token never enters `runner`'s memory, filesystem, or environment.
+- **`app` container.** Runs the Pi Durable harness, the web UI, sign-in and model calls. Holds the Anthropic key and
+  the app token. Has no shell tools and no workspace write access.
+- **`runner` container.** Runs `bash`, `read`, `write` and `edit`. Holds the runner token only. Has no `/data`, and
+  the only mount is `/workspace`. It exposes a small internal HTTP API (exec, read, write) that only `app` can reach,
+  on the `tools` network.
+- The harness uses a custom `ExecutionEnv` (the Pi Durable `env` option) that forwards tool calls to the runner. The
+  agent's tools run in `runner`, and the app token never enters `runner`.
 
-Hardening for both containers:
-- Non-root: both containers run as the invoking host user's uid and gid (build args `APP_UID`/`APP_GID` from `.env`, written by `scripts/setup-secrets.sh`). The secrets stay mode 600 and owned by that user. Isolation between app and runner comes from separate containers, not from separate uids. No `privileged`, no `--pid=host`, no `--network=host`.
-- `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, read-only root filesystem (writable only `/tmp` and the volume it needs).
-- No docker socket, no host paths except the named volumes. The Docker group membership of the host user is root-equivalent on the host, so nothing mounts the socket.
-- Runner path checks: resolve every path and reject anything outside `/workspace` (symlink-aware).
-- `app` port published on `127.0.0.1:8787` only.
+Hardening, for both containers:
 
-Known limits (be explicit):
-- The token is in `app`'s process memory while it makes requests. Anything that can read that process (a bug in `app`, or a future shell tool added to it) could leak it. Keep `app` free of general-purpose tools.
-- Runner network egress: the agent can reach the internet if the runner has it. The token is not in the runner, so it cannot be sent out, but workspace contents could be. DECIDED 2026-11-28 (user m00826): the runner has internet access by default (`egress` network). Mitigation: no credentials in the runner; removing `egress` cuts it off. Open risk: injected tool output could steer exfiltration of workspace files; an allowlist proxy is not built.
-- Anything the agent writes into `/workspace` is visible to any later process that mounts that volume.
-- Rootless Docker or Podman (podman is already installed on this host) would also remove the root-equivalence risk of the docker group. Option to consider.
+- Non-root: both containers run as the invoking host user's uid and gid (build args `APP_UID` and `APP_GID`, from
+  `.env`, written by `scripts/setup-secrets.sh`). Secret files stay mode 600 and owned by that user. Isolation between
+  `app` and `runner` comes from separate containers, not from separate uids. No `privileged`, no `--pid=host`, no
+  `--network=host`.
+- `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, and a read-only root filesystem. Only `/tmp` and the
+  volumes are writable.
+- No Docker socket and no host paths, apart from the named volumes. Membership of the host `docker` group is
+  equivalent to root on the host, so the socket is never mounted.
+- Runner path checks: every path is resolved and anything outside `/workspace` is refused. Symbolic links are
+  followed.
+- The `app` port is published on `${APP_BIND:-0.0.0.0}`.
 
-Open decisions:
-1. Runner internet access: DECIDED yes, by default (user m00826, 2026-11-28).
-2. Rootless Podman instead of Docker: yes or no.
+Known limits:
 
-## Phase 1 record (in progress)
+- The app token is in `app`'s process memory while it makes requests. A bug in `app`, or a future shell tool added to
+  it, could leak it. Keep `app` free of general-purpose tools.
+- The runner can reach the internet by default. The token is not in the runner, so it cannot be sent out, but
+  workspace contents could be. An allowlist proxy is not built.
+- Anything written to `/workspace` is visible to any later process that mounts that volume.
 
-- Auth decision (m00128): Anthropic API key, delivered as a Docker secret file. Compose will mount `./secrets/anthropic_api_key` at `/run/secrets/anthropic_api_key`. The app reads it once at startup (`src/config.ts` `readApiKey`, which requires an `sk-ant-` prefix) and sets it in process memory only. The key is never an env var in compose and never logged.
-- Secret file ownership: compose bind-mounts the host file, so it must be readable by the container UID. Plan: `app` runs as UID 1000 (the usual first host user) with the file mode 0400. Note: this UID is non-root but not separate from the host user; the runner container must use a different UID with no secret access.
-- Files: `src/config.ts`, `src/harness.ts` (opens Harness over `data/session.sqlite`, root conversation, `harness.resume()`), `src/server.ts` (HTTP static + `/healthz`, WebSocket `/ws`: server pushes full `ConversationView` on each change; client sends `submit` (whenBusy steer|followUp) and `abort`), `public/` (plain test page; React UI in Phase 2).
-- Not yet done: auth token on WebSocket (planned), tool environment and runner container (Phase 1b / 4), real key, typecheck of runtime behaviour.
-- Open: rootless Podman vs Docker (runner internet access decided 2026-11-28).
+## Feature status
 
-## Feature status (2026-11-22)
-- Done: model and context-limit settings; manual and automatic compaction; steer (`whenBusy: "steer"`); fork from a message ("branch from here"); reset with optional handoff ("New context"); multiple chats (sidebar, `chats.json` titles); max tool rounds per answer (`maxTurns`, default 50, range 1–500).
-- Known gaps: a run stopped by the turn limit ends as submission status `unanswered`, reason `turn_limit` (verified in DB), but the browser shows no notice. Steer verified only as accepted, not as a mid-answer change. Test chats remain in the data volume.
+Done:
 
-## Plan: review tasks (second check on answers)
-Goal: optional automatic reviewer that checks each answer before it is final and sends Claude back to fix problems.
-1. Use Pi Durable `onYield` hook on the generation task (`defineExtension` + `hook(GenerationTask, { onYield })`, `hookTask`). Pi Durable returns the answer to the agent if the hook rejects it.
-2. Reviewer is a separate `defineTask` that calls the model with the answer and the user's request, returns pass or a list of issues.
-3. Setting per chat: review on/off, reviewer model (default: same as chat). Store in `settings.json`.
-4. Show review result in the transcript as a `review` entry (pass, or issues found and the retry).
-5. Limits: cap retries at 1 to avoid loops; count reviewer tokens against cost; respect `maxTurns`.
-6. Test: a prompt with a deliberate mistake (e.g. wrong arithmetic) should be flagged and corrected; a clean answer should pass without retry.
+- Model and context-limit settings.
+- Manual and automatic compaction.
+- Steer (`whenBusy: "steer"`), which joins after the current tool step.
+- Fork from a message ("branch from here").
+- Reset with optional handoff ("New context").
+- Multiple chats, with a sidebar, newest first.
+- Maximum tool rounds per run (`maxTurns`, default 50, range 1 to 500).
+- Folder uploads, with all-or-nothing staging (see [README](../README.md#folders-and-uploads)).
+- Keep going: a per-chat loop that continues until the answer ends with `DONE`.
+- Answer review: an optional second model check per chat, with at most one retry.
+- Web search through the `pi-web-access` package, inside the app container.
+- MCP servers from `DATA_DIR/mcp.json`. Local programs run in the runner. Remote URLs are reached from the app.
+- Encrypted secret store with a browser panel (see [README](../README.md#encrypted-secret-store)).
+- OpenAI-compatible API for Home Assistant voice, with API keys created in the web app. Voice tool use is off by default.
 
-## Plan: approval-gated push and GUI secrets (decided 2026-11-28, user m00702, m00705)
+Known gaps:
 
-Status: design only. No code written yet. Scope: the app is reachable only on the LAN.
+- A run stopped by the turn limit is stored as submission status `unanswered` with reason `turn_limit`. The browser
+  does not yet show a notice for it.
+- Steer is verified as accepted, but a steer sent during a multi-step run is not yet covered by an automated test.
 
-### Approval-gated git push
-- The runner gets a git tool (`git_push`) and never sees a credential. It runs `git bundle create` over the requested refs in `/workspace` and sends the bundle to the app over the internal `tools` network.
-- The app holds the GitHub token (in the secret store below), has `git` and egress through `edge`, and does not mount `/workspace`. The bundle is the only thing that crosses the boundary.
-- Policy, enforced by the app: one configured repo (`origin` = the repo in `AGENTS.md`), branch `main` by default, no force-push, no deletes, no tag or branch creation unless listed.
-- Approval page: the app shows the commit list (hash, subject, author) and the file names changed (added, modified, deleted), plus the target branch. The user clicks Approve or Reject. Nothing is pushed without that click.
-- On approval, the app unpacks the bundle into a scratch directory, runs `git push origin <branch>` with the token, deletes the scratch copy, and returns the result to the runner and the chat. The token is never written to the bundle, logs, or the transcript.
-- Failures (auth, rejected non-fast-forward) are reported as-is; nothing is retried automatically.
+## Open questions
 
-### Encrypted secret store with GUI
-- Secrets move from Docker secret files into an encrypted store in the `app-data` volume. The app reads them at runtime, so a new key takes effect without a restart.
-- Encryption: AES-256-GCM per value. The master key is a 32-byte file on the host, set once per install (`secrets/master_key`, mode 600). It protects backups and copies of the volume; it does not protect against code running in the app, which needs the key anyway.
-- GUI: list of secret names with a masked value and last-changed time. Add, replace, and delete. Values are write-only: the value is never shown or returned after saving.
-- Changing or adding a secret requires re-entering the app token within the last 5 minutes. Every change is logged (name, time, outcome; never the value).
-- Bootstrap on a new host: one SSH step to place `master_key` and `app_token`. After that, all keys are set from the browser.
-- Secrets in the store: `anthropic_api_key`, `github_repo_token`, `app_token` (may be changed from the GUI, which logs out other sessions). `runner_token` stays a Docker secret: it is internal and never edited by hand.
-- Migration: the existing Docker secret files stay until the store is working and verified on dev. Only then are they removed from compose.
+1. **Rootless Podman instead of Docker.** Rootless Podman would also remove the root-equivalence risk of the `docker`
+   group. Podman is installed on the development host. Not yet chosen.
+2. **Notice for the turn limit in the browser.** Planned. See Known gaps.
 
-### Order of work
-1. Secret store + GUI, with tests (encrypt/decrypt round trip, masked output, re-auth, audit log).
-2. Move `anthropic_api_key` to the store; keep the Docker secret as fallback until verified.
-3. Bundle push tool: runner side, app side, approval page, policy tests.
-4. Deploy to dev, then prod (new host), with a backup of `app-data` first.
+## Planned: approval-gated git push
+
+Status: design only, not built. The app is reachable only on the LAN.
+
+- The runner gets a `git_push` tool and never sees a credential. It runs `git bundle create` over the requested refs in
+  `/workspace`, and sends the bundle to the app over the internal `tools` network.
+- The app holds the GitHub token (in the secret store), has `git`, and has egress through `edge`. It does not mount
+  `/workspace`. The bundle is the only thing that crosses the boundary.
+- Policy, enforced by the app: one configured repository (`origin`), branch `main` by default, no force-push, no
+  deletes, and no tag or branch creation unless listed.
+- Approval page: the app shows the commit list (hash, subject, author), the changed file names (added, modified,
+  deleted) and the target branch. The user clicks Approve or Reject. Nothing is pushed without that click.
+- On approval, the app unpacks the bundle into a scratch directory, runs `git push origin <branch>` with the token,
+  and deletes the scratch copy. It returns the result to the runner and the chat. The token is never written to the
+  bundle, the logs or the transcript.
+- Failures (authentication, rejected non-fast-forward) are reported as they are. Nothing is retried automatically.
+
+## Planned: moving secrets out of Docker secret files
+
+Status: the encrypted secret store and its browser panel are built. Not yet done:
+
+- Moving the Anthropic key into the store. The Docker secret stays as the fallback until the store has been verified.
+- Removing the Docker secret files from `compose.yaml` after that.
+
+The store encrypts each value with AES-256-GCM, using a 32-byte master key on the host (`secrets/master_key`, mode 600).
+The master key protects backups and copies of the volume. It does not protect against code running inside the app,
+which needs the key anyway. Changing a secret requires re-entering the app token within the last 5 minutes. Every
+change is logged (name, time and outcome), never the value.
+
+## Answer review
+
+Implemented in `src/review.ts`, with `src/keep-going-hook.ts` as the hook point.
+
+- The check uses Pi Durable's `onYield` hook on the generation task. If the reviewer rejects the answer, the model
+  gets the reviewer's notes and answers again.
+- The reviewer is a separate call. It returns `PASS` or `FAIL` with notes. The verdict is read from the first word.
+- Settings are per chat: review on or off, and an optional reviewer model. When no reviewer model is set, the chat's
+  own model is used.
+- The review result appears in the transcript.
+- At most one retry per user message. The retry is not reviewed again. Reviewer tokens count toward cost, and
+  `maxTurns` still applies.

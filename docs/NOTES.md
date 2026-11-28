@@ -350,3 +350,47 @@
 - 2026-11-28 Pushed origin main e059bf4..d027b33 (secret store, step S1). Token via temporary askpass, script deleted.
 - 2026-11-28 Runner internet access is now the default (user m00826 "make it the default"). compose.yaml: runner networks [tools, egress]; tools still internal; compose.internet.yaml is a no-op kept for old commands. Reverses the 2026-11-22 review item 23 advice (docs/REVIEW-2026-11-22.md, egress off by default + allowlist proxy); user overrode it, risk recorded in SECURITY.md and DESIGN.md. Verified on dev: runner reaches api.anthropic.com (HTTP 404 = reachable); docker compose config OK with and without the override. Not changed: deploy/production/compose.yaml and deploy/dockhand/compose.yaml keep tools-internal (prod runner already gets LAN and internet via its own override, docs/PRODUCTION.md line 89); decide when prod is next deployed.
 - 2026-11-28 Pushed origin main d027b33..a7dda72 (S1 secret store, runner internet default). Token via temporary askpass, script deleted.
+
+## Production deployment history
+
+Moved here from docs/PRODUCTION.md when the runbook was rewritten as generic steps. Facts are unchanged.
+
+### Initial setup
+- `deploy/production/secrets/{anthropic_api_key,app_token,runner_token}`, mode 600. The Anthropic key was copied from
+  dev; the app token and runner token were generated new.
+- `deploy/production/.env` with `HOST_UID` and `HOST_GID` (the containers run as this uid).
+- SELinux (Enforcing on this host): secrets must carry `container_file_t`. `deploy.sh` does this. Without it the runner
+  fails with `EACCES: permission denied, open '/run/secrets/runner_token'`.
+- Chat data is in `pi-durable-prod_app-data` (SQLite). Earlier, `-v "$PWD/...:/backup"` bind mounts failed with
+  Permission denied on this host (SELinux), so backups stream to a host file.
+
+### Browser-entered key and MCP servers (live since d54cb01)
+- Anthropic key: a key saved in the browser is stored in the app-data volume at credentials.json (mode 600, plaintext).
+  It wins over the Docker secret. Decision and reasoning: see the goal 7 entry earlier in this file.
+- MCP servers: DATA_DIR/mcp.json in the app-data volume. Local programs run inside the runner (no credentials).
+
+### Deployment log
+- 2026-11-22: production created on port 8790, from commit 2d95ba3 (ask_user feature included). Login verified (correct
+  token 200, wrong 401). Model claude-haiku-5-5.
+- 2026-11-22: production updated fb098e2 → d54cb01 (goal 7 browser key, goal 8 MCP servers, docs). Pre-deploy backup:
+  deploy/production/backup/app-data-pre-goal8-2026-11-22-1725.tgz (ignored by git). Checks: healthz ok, all containers
+  up, auth-status source "secret", mcp-list 0 servers, chats kept.
+- 2026-11-22: production updated d54cb01 → a329be2 (edit an MCP server). Backup first:
+  deploy/production/backup/app-data-pre-edit-2026-11-22-1738.tgz (ignored by git). Checks: healthz ok, WS auth-status and
+  mcp-list answer.
+- 2026-11-22: production updated a329be2 → 2a08cad (markdown, UI restyle, chat bubbles, chronological chat list). Backup
+  first: deploy/production/backup/app-data-pre-chatorder-2026-11-22-1755.tgz (git-ignored). Checks: healthz ok, WS
+  auth-status and mcp-list answer. No model call.
+- 2026-11-22: production updated 2a08cad → 5185cc3 (chat list newest first, per user m01121). Backup:
+  deploy/production/backup/app-data-pre-chatorder-rev-2026-11-22-*.tgz (git-ignored). healthz ok.
+- 2026-11-25: production updated 3ade10a → 72bb123 (keep-going loop, per-chat, off by default; browser toggle; README
+  section). Backup first: deploy/production/backup/app-data-pre-keepgoing-2026-11-25-0024.tgz (git-ignored). Checks:
+  healthz ok, both containers healthy, .deployed-commit 72bb123. No model call; prod chats untouched.
+- 2026-11-25: production updated 72bb123 → 5c6bd6d (web search: pi-web-access built-in MCP server "web" in the app).
+  Backup first: deploy/production/backup/app-data-pre-websearch-2026-11-25-0051.tgz (git-ignored). Checks: healthz ok,
+  both containers healthy, pi-web-access present in app image. No model call.
+- 2026-11-25: production updated 5c6bd6d → 0c8be08 (runner joins a normal "lan" network so it can reach the LAN; user
+  approved m02742). Backup first: deploy/production/backup/app-data-pre-lan-2026-11-25-0104.tgz (git-ignored). Checks:
+  healthz ok at 192.168.1.30:8790; runner on pi-durable-prod_lan and _tools; runner reaches 192.168.1.1:443. No model
+  call. Note: production runner now has LAN and internet access; no host firewall rule limits it.
+- 2026-11-28 Documentation rewritten for new users (user m00855): README restructured (quick start, using the app, configuration, networking, secrets, updating, development), docs/README.md index added, DESIGN/PRODUCTION/SECURITY/HOME-ASSISTANT cleaned of dates and change history. Dated production deploy log moved to the "Production deployment history" section below. Open: no automated test currently covers steer (PLAN 2.1 says one exists; grep of tests/ finds none). Docs are checked against code; claims not re-verified: the deploy script behaviour in PRODUCTION.md.

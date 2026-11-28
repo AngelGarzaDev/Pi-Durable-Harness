@@ -64,7 +64,7 @@ services:
 networks:
   edge: {}                 # normal bridge: app reaches api.anthropic.com
   tools: { internal: true } # no route to the outside world: app <-> runner only
-  egress: {}                # normal bridge: the runner reaches the internet (default since 2026-11-28, user m00826)
+  egress: {}                # normal bridge: the runner reaches the internet
 
 secrets:
   anthropic_api_key:
