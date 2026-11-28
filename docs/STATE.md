@@ -24,3 +24,6 @@ Update README/NOTES, commit, push (askpass recipe; delete script), dev redeploy 
 - Dev mcp.json "echo" entry and /workspace/mcp-live: delete if you want.
 - Reverse proxy / HTTPS for LAN (you said you'll do it).
 - Known: a folder name starting with a dot loses the dot (".github" becomes "github") because the name sanitizer drops leading dots.
+
+## Planned next (not started)
+- Staged folder upload: see docs/PLAN-STAGED-FOLDER-UPLOAD.md. Answer its 4 questions first.

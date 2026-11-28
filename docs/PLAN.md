@@ -93,3 +93,5 @@ Stop rules to implement: the model says DONE (marker agreed in the prompt), max 
 - [x] 12.4 Docs: README config note, NOTES decisions. Commit.
 - [x] 12.5 Dev deploy (docker compose up -d --build), healthz, one live Haiku check that uses web_search (haiku-5-5, ≤100000).
 - [ ] 12.6 Prod only when user asks (deploy/production/deploy.sh).
+
+- [ ] Staged folder upload (user m00500): files go to a hidden staging dir in /workspace; commit by rename on success; discard on cancel; sweep stale. Plan: docs/PLAN-STAGED-FOLDER-UPLOAD.md. Waiting for answers to its 4 questions before step 1.
