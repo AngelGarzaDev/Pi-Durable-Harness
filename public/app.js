@@ -308,8 +308,6 @@ async function uploadFolder(files, query, onProgress) {
 	const list = Array.from(files);
 	const bytes = list.reduce((sum, f) => sum + f.size, 0);
 	if (bytes > MAX_FOLDER_BYTES) return { saved: 0, failed: [], error: "The folder is " + (bytes / 1024 ** 3).toFixed(2) + " GB, over the 2 GB limit. Upload part of it." };
-	const big = list.find((f) => f.size > MAX_UPLOAD);
-	if (big) return { saved: 0, failed: [], error: "Nothing was uploaded: " + (big.webkitRelativePath || big.name) + " is over the 15 MB file limit." };
 	const top = list.length ? list[0].webkitRelativePath.split("/")[0] : "";
 	const failed = [];
 	if (!list.length) return { saved: 0, failed, top, folderPath: "", cancelled: false, skipped: 0 };
