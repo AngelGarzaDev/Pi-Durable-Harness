@@ -164,3 +164,30 @@ Goal: optional automatic reviewer that checks each answer before it is final and
 4. Show review result in the transcript as a `review` entry (pass, or issues found and the retry).
 5. Limits: cap retries at 1 to avoid loops; count reviewer tokens against cost; respect `maxTurns`.
 6. Test: a prompt with a deliberate mistake (e.g. wrong arithmetic) should be flagged and corrected; a clean answer should pass without retry.
+
+## Plan: approval-gated push and GUI secrets (decided 2026-11-28, user m00702, m00705)
+
+Status: design only. No code written yet. Scope: the app is reachable only on the LAN.
+
+### Approval-gated git push
+- The runner gets a git tool (`git_push`) and never sees a credential. It runs `git bundle create` over the requested refs in `/workspace` and sends the bundle to the app over the internal `tools` network.
+- The app holds the GitHub token (in the secret store below), has `git` and egress through `edge`, and does not mount `/workspace`. The bundle is the only thing that crosses the boundary.
+- Policy, enforced by the app: one configured repo (`origin` = the repo in `AGENTS.md`), branch `main` by default, no force-push, no deletes, no tag or branch creation unless listed.
+- Approval page: the app shows the commit list (hash, subject, author) and the file names changed (added, modified, deleted), plus the target branch. The user clicks Approve or Reject. Nothing is pushed without that click.
+- On approval, the app unpacks the bundle into a scratch directory, runs `git push origin <branch>` with the token, deletes the scratch copy, and returns the result to the runner and the chat. The token is never written to the bundle, logs, or the transcript.
+- Failures (auth, rejected non-fast-forward) are reported as-is; nothing is retried automatically.
+
+### Encrypted secret store with GUI
+- Secrets move from Docker secret files into an encrypted store in the `app-data` volume. The app reads them at runtime, so a new key takes effect without a restart.
+- Encryption: AES-256-GCM per value. The master key is a 32-byte file on the host, set once per install (`secrets/master_key`, mode 600). It protects backups and copies of the volume; it does not protect against code running in the app, which needs the key anyway.
+- GUI: list of secret names with a masked value and last-changed time. Add, replace, and delete. Values are write-only: the value is never shown or returned after saving.
+- Changing or adding a secret requires re-entering the app token within the last 5 minutes. Every change is logged (name, time, outcome; never the value).
+- Bootstrap on a new host: one SSH step to place `master_key` and `app_token`. After that, all keys are set from the browser.
+- Secrets in the store: `anthropic_api_key`, `github_repo_token`, `app_token` (may be changed from the GUI, which logs out other sessions). `runner_token` stays a Docker secret: it is internal and never edited by hand.
+- Migration: the existing Docker secret files stay until the store is working and verified on dev. Only then are they removed from compose.
+
+### Order of work
+1. Secret store + GUI, with tests (encrypt/decrypt round trip, masked output, re-auth, audit log).
+2. Move `anthropic_api_key` to the store; keep the Docker secret as fallback until verified.
+3. Bundle push tool: runner side, app side, approval page, policy tests.
+4. Deploy to dev, then prod (new host), with a backup of `app-data` first.
