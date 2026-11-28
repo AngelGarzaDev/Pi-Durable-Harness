@@ -17,7 +17,7 @@ Step S1 of the approval-gated push and GUI secrets plan (docs/PLAN.md, section "
 
 ## Status
 - Dev app running with master_key (container healthy after chcon fix).
-- Not committed yet at time of writing: S1 changes (run `git status`). Commit after tests pass, then push per AGENTS.md rule.
+- S1 committed and pushed as d027b33 (tests 214 pass).
 - Prod (192.168.1.30:8790) still runs the old build. Not deployed; needs your go-ahead and an app-data backup first.
 
 ## Known failures / open

@@ -347,3 +347,4 @@
 - 2026-11-28 Decision: re-authentication is per WebSocket connection (a new page load starts locked). The app token check reuses tokenMatches (timing-safe). No separate lockout on secrets-reauth; the token is 32+ random characters, and LAN-only access is the user's stated setup (user m00705).
 - 2026-11-28 Live test on dev (no model call, cost 0): WS secrets-list, refused set, reauth, set probe secret, remove. Secret file had no plaintext; audit log had 4 lines, no values. Probe secret removed afterwards.
 - 2026-11-28 Test count: npm test 214 pass = 196 before + 10 in tests/secret-store.test.ts + 8 in tests/secrets-ws.test.ts.
+- 2026-11-28 Pushed origin main e059bf4..d027b33 (secret store, step S1). Token via temporary askpass, script deleted.
