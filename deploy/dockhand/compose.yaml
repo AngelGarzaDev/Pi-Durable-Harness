@@ -1,8 +1,10 @@
 # Dockhand stack: ONE self-contained compose file (mirrors deploy/production/compose.yaml).
 # Dockhand reads only this text, so there are no relative paths and no ./ files:
 #  - images are built from the git repo (build context is a URL; the repo must be pushed first),
-#  - secrets are absolute host paths. Create them once on the host (mode 600, owner = the uid below).
-#  - HOST_UID/HOST_GID are fixed below; change them if the host user differs.
+#  - secrets come from ${SECRETS_DIR} (default ./secrets). On Dockhand, set SECRETS_DIR in the stack
+#    variables to an ABSOLUTE host path that the Docker daemon can see (e.g. /mnt/<pool>/pi-durable/secrets).
+#    Relative ./secrets only works when Dockhand's stack dir is the same path on the host.
+#    Files must exist, mode 600, owned by uid 1000 (or the build arg APP_UID).
 # Before first deploy: docs/DOCKHAND.md. Do not use `docker compose down -v` on this stack.
 name: pi-durable-dockhand
 
@@ -75,11 +77,11 @@ networks:
 
 secrets:
   anthropic_api_key:
-    file: /var/home/angel/Pi/host/durable-web/deploy/production/secrets/anthropic_api_key
+    file: ${SECRETS_DIR:-./secrets}/anthropic_api_key
   app_token:
-    file: /var/home/angel/Pi/host/durable-web/deploy/production/secrets/app_token
+    file: ${SECRETS_DIR:-./secrets}/app_token
   runner_token:
-    file: /var/home/angel/Pi/host/durable-web/deploy/production/secrets/runner_token
+    file: ${SECRETS_DIR:-./secrets}/runner_token
 
 volumes:
   app-data:
