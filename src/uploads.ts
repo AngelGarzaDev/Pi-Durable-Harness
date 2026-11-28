@@ -20,3 +20,20 @@ export function candidateName(name: string, n: number): string {
 	const ext = dot > 0 ? name.slice(dot) : "";
 	return `${stem}-${n}${ext}`;
 }
+
+// Folder uploads send each file's path inside the folder (from the browser's webkitRelativePath, always "/"-separated).
+// Every part is sanitized like a file name. Returns the parts (folders first, file name last), or undefined when the
+// path is empty, has "." or ".." or an empty part, is deeper than UPLOAD_MAX_DEPTH, or a part has nothing usable left.
+export const UPLOAD_MAX_DEPTH = 8;
+export function sanitizeRelativePath(raw: string): string[] | undefined {
+	const parts = raw.normalize("NFC").split("/");
+	if (parts.length > UPLOAD_MAX_DEPTH) return undefined;
+	const out: string[] = [];
+	for (const part of parts) {
+		if (part === "" || part === "." || part === "..") return undefined;
+		const name = sanitizeUploadName(part);
+		if (name === undefined) return undefined;
+		out.push(name);
+	}
+	return out;
+}

@@ -174,9 +174,10 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
     <div class="row"><button type="submit">Save AGENTS.md</button> <span id="wsagentsmsg"></span></div>
   </form>
   <form id="wsuploadform">
-    <h3>Upload a file to this workspace</h3>
-    <p class="muted">The file is saved in the workspace folder. If the name is taken, it is saved as name-2, name-3 and so on. Up to 15 MB.</p>
-    <div class="row"><input type="file" id="wsupload"> <span id="wsuploadmsg"></span></div>
+    <h3>Upload files or a folder to this workspace</h3>
+    <p class="muted">Files are saved in the workspace folder. If a name is taken, it is saved as name-2, name-3 and so on. Up to 15 MB per file. A folder keeps its structure inside the workspace folder; files that already exist get the -2 names.</p>
+    <div class="row"><input type="file" id="wsupload" multiple> <span id="wsuploadmsg"></span></div>
+    <div class="row"><label>Folder <input type="file" id="wsuploaddir" webkitdirectory multiple></label></div>
   </form>
   <div id="wsfooter">
     <span class="muted">Saves both sections above.</span>
@@ -256,7 +257,9 @@ form.bar { display: flex; gap: .5rem; margin: .75rem auto 0; width: 100%; max-wi
   <form id="f" class="bar" autocomplete="off">
     <input id="msg" autofocus autocomplete="off" autocapitalize="sentences" spellcheck="true" data-form-type="other" data-lpignore="true" placeholder="Type a message">
     <button type="button" id="attach" title="Upload a file to this chat's workspace folder. Its path is added to your message.">Attach</button>
-    <input type="file" id="attachfile" hidden>
+    <input type="file" id="attachfile" hidden multiple>
+    <button type="button" id="attachdir" title="Upload a whole folder into this chat's workspace folder. The folder's path is added to your message.">Folder</button>
+    <input type="file" id="attachdirpick" hidden webkitdirectory multiple>
     <button id="send" title="Waits until Claude finishes the current answer">Send</button>
     <button type="button" id="steer" title="Adds your message to the answer in progress, after the current tool step finishes. The answer does not stop.">Steer</button>
   </form>

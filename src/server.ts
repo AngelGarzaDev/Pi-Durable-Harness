@@ -19,7 +19,7 @@ import { checkSettings, saveSettings, type ChatSettings } from "./settings.js";
 import type { Conversation, ConversationId, ConversationRecord, ConversationWatch, Cursor, EntryId, TaskId } from "@earendil-works/pi-durable";
 import { collectPages, loadTitles, saveTitles, titleFrom, type Titles } from "./chats.js";
 import { AGENTS_FILE, AGENTS_HEADER, AGENTS_MAX_CHARS, combineInstructions, readFolderAgents, stripLegacyBlock } from "./agents-md.js";
-import { UPLOAD_MAX_BYTES, UPLOAD_MAX_TRIES, candidateName, sanitizeUploadName } from "./uploads.js";
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_TRIES, candidateName, sanitizeRelativePath, sanitizeUploadName } from "./uploads.js";
 import { WORKSPACE_ROOT, checkFolderName, folderPath, loadChatFolders, saveChatFolders, type ChatFolders } from "./chat-folder.js";
 import { checkChatInstructions, loadChatInstructions, saveChatInstructions, type ChatInstructions } from "./chat-instructions.js";
 import { FolderRules, loadLegacyRules, saveLegacyRules } from "./folder-rules.js";
@@ -386,15 +386,31 @@ async function handleUpload(req: import("node:http").IncomingMessage, res: impor
 	} catch {
 		decoded = "";
 	}
-	const name = sanitizeUploadName(decoded);
-	if (name === undefined) {
+	// A folder upload sends x-relative-path (folder parts, then the file name). Folders are created on the runner.
+	const relative = req.headers["x-relative-path"] !== undefined;
+	let parts: string[] | undefined;
+	if (relative) {
+		let relPath = "";
+		try {
+			relPath = decodeURIComponent(String(req.headers["x-relative-path"]));
+		} catch {
+			relPath = "";
+		}
+		parts = sanitizeRelativePath(relPath);
+	} else {
+		const name = sanitizeUploadName(decoded);
+		parts = name === undefined ? undefined : [name];
+	}
+	if (parts === undefined) {
 		await readBody(req, UPLOAD_MAX_BYTES).catch(() => undefined);
 		return void res.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: "File name is missing." }));
 	}
+	const name = parts[parts.length - 1]!;
+	const folders = parts.slice(0, -1).map((part) => `/${part}`).join("");
 	const bytes = await readRawBody(req, UPLOAD_MAX_BYTES);
 	for (let n = 1; n <= UPLOAD_MAX_TRIES; n++) {
 		const candidate = candidateName(name, n);
-		const path = `${target.dir}/${candidate}`;
+		const path = `${target.dir}${folders}/${candidate}`;
 		let r: Response;
 		try {
 			r = await fetch(`${runnerUrl}/v1/upload`, {

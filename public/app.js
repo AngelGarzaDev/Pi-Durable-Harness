@@ -274,35 +274,96 @@ document.getElementById("f").onsubmit = (e) => {
 };
 document.getElementById("steer").onclick = () => send("steer");
 
-// File uploads. The server saves the file under a safe name and returns its path in the workspace.
+// File uploads. The server saves each file under a safe name and returns its path in the workspace.
 const MAX_UPLOAD = 15 * 1024 * 1024;
-async function uploadFile(file, query) {
-	if (file.size > MAX_UPLOAD) return { ok: false, error: "File is too large (15 MB limit)." };
-	const r = await fetch("/upload?" + query, { method: "POST", headers: { "x-file-name": encodeURIComponent(file.name) }, body: file });
+const MAX_FOLDER_FILES = 2000;
+// rel: the file's path inside a picked folder (sent as x-relative-path so the server creates the folders).
+async function uploadFile(file, query, rel) {
+	if (file.size > MAX_UPLOAD) return { ok: false, error: file.name + " is too large (15 MB limit)." };
+	const headers = { "x-file-name": encodeURIComponent(file.name) };
+	if (rel !== undefined) headers["x-relative-path"] = encodeURIComponent(rel);
+	const r = await fetch("/upload?" + query, { method: "POST", headers, body: file });
 	return r.json().catch(() => ({ ok: false, error: "Upload failed." }));
 }
+// Uploads each file of a picked folder one after another. Returns the saved count, the failures, the folder's top name
+// and where it was saved in the workspace (folderPath, from the first saved file).
+async function uploadFolder(files, query, onProgress) {
+	const list = Array.from(files);
+	if (list.length > MAX_FOLDER_FILES) return { saved: 0, failed: [], error: "The folder has more than " + MAX_FOLDER_FILES + " files. Upload part of it." };
+	const top = list.length ? list[0].webkitRelativePath.split("/")[0] : "";
+	let saved = 0;
+	let folderPath = "";
+	const failed = [];
+	for (let i = 0; i < list.length; i++) {
+		onProgress(i + 1, list.length);
+		const f = list[i];
+		const res = await uploadFile(f, query, f.webkitRelativePath || f.name);
+		if (res.ok) {
+			saved++;
+			// The saved path is .../<top>/...; the folder is everything up to and including <top>.
+			const at = res.path.indexOf("/" + top + "/");
+			if (folderPath === "" && at >= 0) folderPath = res.path.slice(0, at + top.length + 1);
+		} else failed.push(f.webkitRelativePath || f.name);
+	}
+	return { saved, failed, top, folderPath };
+}
+function folderSummary(res) {
+	const more = res.failed.length ? " " + res.failed.length + " could not be saved: " + res.failed.slice(0, 5).join(", ") + (res.failed.length > 5 ? " and more" : "") + "." : "";
+	return "Saved " + res.saved + " file(s) from " + res.top + "." + more;
+}
 document.getElementById("attach").onclick = () => document.getElementById("attachfile").click();
+document.getElementById("attachdir").onclick = () => document.getElementById("attachdirpick").click();
 document.getElementById("attachfile").onchange = async (e) => {
-	const file = e.target.files[0];
+	const files = Array.from(e.target.files);
 	e.target.value = "";
-	if (!file) return;
+	if (!files.length) return;
 	if (openId === null) return showNotice("Open a chat before uploading a file.");
-	showNotice("Uploading " + file.name + "…");
-	const res = await uploadFile(file, "chat=" + openId);
-	if (res.ok) {
-		input.value = (input.value.trim() ? input.value.trimEnd() + " " : "") + res.path;
-		showNotice("Uploaded " + res.name + ". Its path is in your message.");
-	} else showNotice(res.error);
+	const paths = [];
+	const failed = [];
+	for (const file of files) {
+		showNotice("Uploading " + file.name + "…");
+		const res = await uploadFile(file, "chat=" + openId);
+		if (res.ok) paths.push(res.path);
+		else failed.push(file.name + ": " + res.error);
+	}
+	if (paths.length) input.value = (input.value.trim() ? input.value.trimEnd() + " " : "") + paths.join(" ");
+	showNotice(failed.length ? failed.join(" ") : "Uploaded " + paths.length + " file(s). Their paths are in your message.");
+	input.focus();
+};
+document.getElementById("attachdirpick").onchange = async (e) => {
+	const files = e.target.files;
+	e.target.value = "";
+	if (!files || !files.length) return;
+	if (openId === null) return showNotice("Open a chat before uploading a folder.");
+	const res = await uploadFolder(files, "chat=" + openId, (n, total) => showNotice("Uploading folder: " + n + " of " + total + "…"));
+	if (res.error) return showNotice(res.error);
+	if (res.saved && res.folderPath) input.value = (input.value.trim() ? input.value.trimEnd() + " " : "") + res.folderPath;
+	showNotice(folderSummary(res));
 	input.focus();
 };
 const wsUploadMsg = document.getElementById("wsuploadmsg");
 document.getElementById("wsupload").onchange = async (e) => {
-	const file = e.target.files[0];
+	const files = Array.from(e.target.files);
 	e.target.value = "";
-	if (!file || !wsFolder) return;
-	wsUploadMsg.textContent = "Uploading " + file.name + "…";
-	const res = await uploadFile(file, "folder=" + encodeURIComponent(wsFolder));
-	wsUploadMsg.textContent = res.ok ? "Saved as " + res.path : res.error;
+	if (!files.length || !wsFolder) return;
+	const saved = [];
+	const failed = [];
+	for (const file of files) {
+		wsUploadMsg.textContent = "Uploading " + file.name + "…";
+		const res = await uploadFile(file, "folder=" + encodeURIComponent(wsFolder));
+		if (res.ok) saved.push(res.path);
+		else failed.push(file.name + ": " + res.error);
+	}
+	wsUploadMsg.textContent = failed.length ? failed.join(" ") : "Saved " + saved.length + " file(s).";
+};
+document.getElementById("wsuploaddir").onchange = async (e) => {
+	const files = e.target.files;
+	e.target.value = "";
+	if (!files || !files.length || !wsFolder) return;
+	const res = await uploadFolder(files, "folder=" + encodeURIComponent(wsFolder), (n, total) => {
+		wsUploadMsg.textContent = "Uploading folder: " + n + " of " + total + "…";
+	});
+	wsUploadMsg.textContent = res.error || folderSummary(res);
 };
 const newFolder = document.getElementById("newfolder");
 const newMsg = document.getElementById("newmsg");

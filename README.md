@@ -126,6 +126,9 @@ Anthropic key is always read from a file, never from an environment variable.
 Chat settings (model, context limit, maximum tool rounds, review) are changed in the browser and saved in
 `DATA_DIR/settings.json`. The default context limit is 100,000 tokens.
 
+### Uploading files and folders
+In a chat, the **Attach** button uploads files and **Folder** uploads a whole folder; the saved paths are added to your message. In the workspace dialog, the file and folder pickers save into that workspace's folder. Folders keep their structure (up to 8 levels). Each file is limited to 15 MB, and a name that is taken gets `-2`, `-3` and so on. A chat with no folder uploads to `/workspace/uploads`. Names are cleaned: leading dots are dropped, so `.github` is saved as `github`.
+
 ### Web search
 
 The model has `web_search`, `fetch_content`, `get_search_content` and `source_check` (as `mcp__web__*`). They come

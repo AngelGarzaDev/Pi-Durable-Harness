@@ -7,7 +7,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { candidateName, sanitizeUploadName, UPLOAD_MAX_BYTES } from "../src/uploads.ts";
+import { candidateName, sanitizeRelativePath, sanitizeUploadName, UPLOAD_MAX_BYTES } from "../src/uploads.ts";
 
 const PORT = 20100 + Math.floor(Math.random() * 400);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -143,4 +143,34 @@ test("a file over 15 MB is refused with 413", async () => {
 	const r = await upload("folder=proj", "big.bin", big);
 	assert.equal(r.status, 413);
 	assert.equal(stored.has("/workspace/proj/big.bin"), false);
+});
+
+test("sanitizeRelativePath keeps folders and the file, and refuses unsafe paths", () => {
+	assert.deepEqual(sanitizeRelativePath("photos/2026/a.txt"), ["photos", "2026", "a.txt"]);
+	assert.deepEqual(sanitizeRelativePath("top/a b.txt"), ["top", "a b.txt"]);
+	assert.equal(sanitizeRelativePath("../x.txt"), undefined);
+	assert.equal(sanitizeRelativePath("a/../x.txt"), undefined);
+	assert.equal(sanitizeRelativePath("a//x.txt"), undefined);
+	assert.equal(sanitizeRelativePath("a/./x.txt"), undefined);
+	assert.equal(sanitizeRelativePath("a/" + Array(9).fill("d").join("/") + "/f.txt"), undefined);
+	assert.equal(sanitizeRelativePath("a/.../x.txt"), undefined);
+});
+
+function uploadRel(query: string, rel: string, body: Buffer | string) {
+	const headers: Record<string, string> = { "content-type": "application/octet-stream", cookie, "x-relative-path": encodeURIComponent(rel) };
+	return fetch(`${BASE}/upload?${query}`, { method: "POST", headers, body: typeof body === "string" ? body : new Uint8Array(body) });
+}
+
+test("a folder upload keeps its structure under the target folder", async () => {
+	const r = await uploadRel("folder=proj", "photos/2026/a.txt", "nested");
+	assert.equal(r.status, 200);
+	assert.equal(stored.get("/workspace/proj/photos/2026/a.txt")?.toString(), "nested");
+	const again = await uploadRel("folder=proj", "photos/2026/a.txt", "second");
+	assert.equal(again.status, 200);
+	assert.equal(((await again.json()) as { path: string }).path, "/workspace/proj/photos/2026/a-2.txt");
+});
+
+test("a folder upload with an unsafe relative path is refused", async () => {
+	assert.equal((await uploadRel("folder=proj", "../escape.txt", "x")).status, 400);
+	assert.equal(stored.has("/workspace/escape.txt"), false);
 });
