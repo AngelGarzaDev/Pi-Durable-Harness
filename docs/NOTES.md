@@ -407,3 +407,4 @@ Tests: tests/anthropic-store.test.ts (6, new), tests/secrets-ws.test.ts (+3). Fu
 - Mirror lives at dataDir/git-mirror.git, never the workspace. Bundles are removed after propose or push.
 - Tests: tests/git-policy.test.ts, tests/git-push.test.ts (real bare origin), tests/push-approval.test.ts (faux model, approve and reject), tests/runner-http.test.ts bundle case. Test bugs fixed on the way: bundle inspection must run inside a repo (bundle verify refuses outside one); runner bundles the workspace root, so the test repo is the workspace; header slice was 14 bytes instead of 15.
 - Live check still needed: set GIT_REMOTE_URL and github_repo_token, then one real push to a throwaway branch is NOT allowed (main only), so test against a local bare origin only unless the user approves a real push.
+- 2026-11-28 pushed 5e38fe2..954c680 (steer test, upload-limit removal, S3) to origin main (askpass recipe, script deleted).
